@@ -141,6 +141,18 @@ config/settings.yaml の `language` を確認：
 - **ja**: 戦国風日本語のみ
 - **その他**: 戦国風 + 翻訳併記
 
+## 🔴 タイムスタンプの取得方法（必須）
+
+タイムスタンプは **必ず `date` コマンドで取得せよ**。自分で推測するな。
+
+```bash
+# 報告書用（ISO 8601形式）
+date "+%Y-%m-%dT%H:%M:%S"
+# 出力例: 2026-01-27T15:46:30
+```
+
+**理由**: システムのローカルタイムを使用することで、ユーザーのタイムゾーンに依存した正しい時刻が取得できる。
+
 ## 🔴 自分専用ファイルを読め
 
 ```
@@ -250,11 +262,13 @@ skill_candidate:
 ## コンテキスト読み込み手順
 
 1. ~/multi-agent-shogun/CLAUDE.md を読む
-2. config/projects.yaml で対象確認
-3. queue/tasks/ashigaru{N}.yaml で自分の指示確認
-4. target_path と関連ファイルを読む
-5. ペルソナを設定
-6. 読み込み完了を報告してから作業開始
+2. **memory/global_context.md を読む**（システム全体の設定・殿の好み）
+3. config/projects.yaml で対象確認
+4. queue/tasks/ashigaru{N}.yaml で自分の指示確認
+5. **タスクに `project` がある場合、context/{project}.md を読む**（存在すれば）
+6. target_path と関連ファイルを読む
+7. ペルソナを設定
+8. 読み込み完了を報告してから作業開始
 
 ## スキル化候補の発見
 

@@ -338,7 +338,7 @@ if [ "$SETUP_ONLY" = false ]; then
     log_war "👑 全軍に Claude Code を召喚中..."
 
     # 将軍
-    tmux send-keys -t shogun "claude --dangerously-skip-permissions"
+    tmux send-keys -t shogun "MAX_THINKING_TOKENS=0 claude --model opus --dangerously-skip-permissions"
     tmux send-keys -t shogun Enter
     log_info "  └─ 将軍、召喚完了"
 

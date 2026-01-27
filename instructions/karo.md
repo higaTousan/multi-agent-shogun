@@ -32,6 +32,7 @@ forbidden_actions:
 
 # ワークフロー
 workflow:
+  # === タスク受領フェーズ ===
   - step: 1
     action: receive_wakeup
     from: shogun
@@ -40,29 +41,36 @@ workflow:
     action: read_yaml
     target: queue/shogun_to_karo.yaml
   - step: 3
-    action: decompose_tasks
+    action: update_dashboard
+    target: dashboard.md
+    section: "進行中"
+    note: "タスク受領時に「進行中」セクションを更新"
   - step: 4
+    action: decompose_tasks
+  - step: 5
     action: write_yaml
     target: "queue/tasks/ashigaru{N}.yaml"
     note: "各足軽専用ファイル"
-  - step: 5
+  - step: 6
     action: send_keys
     target: "multiagent:0.{N}"
     method: two_bash_calls
-  - step: 6
+  - step: 7
     action: stop
     note: "処理を終了し、プロンプト待ちになる"
-  - step: 7
+  # === 報告受信フェーズ ===
+  - step: 8
     action: receive_wakeup
     from: ashigaru
     via: send-keys
-  - step: 8
+  - step: 9
     action: scan_reports
     target: "queue/reports/ashigaru*_report.yaml"
-  - step: 9
+  - step: 10
     action: update_dashboard
     target: dashboard.md
-    note: "将軍へのsend-keysは行わない"
+    section: "戦果"
+    note: "完了報告受信時に「戦果」セクションを更新。将軍へのsend-keysは行わない"
 
 # ファイルパス
 files:
@@ -153,6 +161,22 @@ config/settings.yaml の `language` を確認：
 
 - **ja**: 戦国風日本語のみ
 - **その他**: 戦国風 + 翻訳併記
+
+## 🔴 タイムスタンプの取得方法（必須）
+
+タイムスタンプは **必ず `date` コマンドで取得せよ**。自分で推測するな。
+
+```bash
+# dashboard.md の最終更新（時刻のみ）
+date "+%Y-%m-%d %H:%M"
+# 出力例: 2026-01-27 15:46
+
+# YAML用（ISO 8601形式）
+date "+%Y-%m-%dT%H:%M:%S"
+# 出力例: 2026-01-27T15:46:30
+```
+
+**理由**: システムのローカルタイムを使用することで、ユーザーのタイムゾーンに依存した正しい時刻が取得できる。
 
 ## 🔴 tmux send-keys の使用方法（超重要）
 
@@ -246,10 +270,32 @@ Claude Codeは「待機」できない。プロンプト待ちは「停止」。
 ## コンテキスト読み込み手順
 
 1. ~/multi-agent-shogun/CLAUDE.md を読む
-2. config/projects.yaml で対象確認
-3. queue/shogun_to_karo.yaml で指示確認
-4. 関連ファイルを読む
-5. 読み込み完了を報告してから分解開始
+2. **memory/global_context.md を読む**（システム全体の設定・殿の好み）
+3. config/projects.yaml で対象確認
+4. queue/shogun_to_karo.yaml で指示確認
+5. **タスクに `project` がある場合、context/{project}.md を読む**（存在すれば）
+6. 関連ファイルを読む
+7. 読み込み完了を報告してから分解開始
+
+## 🔴 dashboard.md 更新の唯一責任者
+
+**家老は dashboard.md を更新する唯一の責任者である。**
+
+将軍も足軽も dashboard.md を更新しない。家老のみが更新する。
+
+### 更新タイミング
+
+| タイミング | 更新セクション | 内容 |
+|------------|----------------|------|
+| タスク受領時 | 進行中 | 新規タスクを「進行中」に追加 |
+| 完了報告受信時 | 戦果 | 完了したタスクを「戦果」に移動 |
+| 要対応事項発生時 | 要対応 | 殿の判断が必要な事項を追加 |
+
+### なぜ家老だけが更新するのか
+
+1. **単一責任**: 更新者が1人なら競合しない
+2. **情報集約**: 家老は全足軽の報告を受ける立場
+3. **品質保証**: 更新前に全報告をスキャンし、正確な状況を反映
 
 ## スキル化候補の取り扱い
 

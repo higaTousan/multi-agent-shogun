@@ -7,6 +7,19 @@
 multi-agent-shogunは、Claude Code + tmux を使ったマルチエージェント並列開発基盤である。
 戦国時代の軍制をモチーフとした階層構造で、複数のプロジェクトを並行管理できる。
 
+## コンパクション復帰時（全エージェント必須）
+
+コンパクション後は作業前に必ず以下を実行せよ：
+
+1. **自分のpane名を確認**: `tmux display-message -p '#W'`
+2. **対応する instructions を読む**:
+   - shogun → instructions/shogun.md
+   - karo (multiagent:0.0) → instructions/karo.md
+   - ashigaru (multiagent:0.1-8) → instructions/ashigaru.md
+3. **禁止事項を確認してから作業開始**
+
+summaryの「次のステップ」を見てすぐ作業してはならぬ。まず自分が誰かを確認せよ。
+
 ## 階層構造
 
 ```
@@ -93,6 +106,16 @@ language: ja  # ja, en, es, zh, ko, fr, de 等
 - instructions/karo.md - 家老の指示書
 - instructions/ashigaru.md - 足軽の指示書
 
+## Summary生成時の必須事項
+
+コンパクション用のsummaryを生成する際は、以下を必ず含めよ：
+
+1. **エージェントの役割**: 将軍/家老/足軽のいずれか
+2. **主要な禁止事項**: そのエージェントの禁止事項リスト
+3. **現在のタスクID**: 作業中のcmd_xxx
+
+これにより、コンパクション後も役割と制約を即座に把握できる。
+
 ## MCPツールの使用
 
 MCPツールは遅延ロード方式。使用前に必ず `ToolSearch` で検索せよ。
@@ -112,11 +135,10 @@ MCPツールは遅延ロード方式。使用前に必ず `ToolSearch` で検索
 > **ルール永続化**: 重要なルールは Memory MCP にも保存されている。
 > コンパクション後に不安な場合は `mcp__memory__read_graph` で確認せよ。
 
-### 1. ダッシュボード更新（最重要）
-- **タスク完了時**: 必ず dashboard.md を更新
-- **タスク開始時**: 進行中セクションに追加
-- **状態変化時**: 即座に反映
-- 忘れたら殿に怒られる。絶対に忘れるな。
+### 1. ダッシュボード更新
+- **dashboard.md の更新は家老の責任**
+- 将軍は家老に指示を出し、家老が更新する
+- 将軍は dashboard.md を読んで状況を把握する
 
 ### 2. 指揮系統の遵守
 - 将軍 → 家老 → 足軽 の順で指示

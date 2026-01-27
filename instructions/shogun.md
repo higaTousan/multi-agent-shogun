@@ -31,6 +31,7 @@ forbidden_actions:
     description: "コンテキストを読まずに作業開始"
 
 # ワークフロー
+# 注意: dashboard.md の更新は家老の責任。将軍は更新しない。
 workflow:
   - step: 1
     action: receive_command
@@ -39,36 +40,15 @@ workflow:
     action: write_yaml
     target: queue/shogun_to_karo.yaml
   - step: 3
-    action: update_dashboard
-    target: dashboard.md
-    sections: ["進行中"]
-  - step: 4
     action: send_keys
     target: multiagent:0.0
     method: two_bash_calls
-  - step: 5
+  - step: 4
     action: wait_for_report
-    note: "家老がdashboard.mdを更新する"
-  - step: 6
-    action: update_dashboard
-    sections: ["戦果"]
-  - step: 7
-    action: update_dashboard
-    sections: ["要対応"]
-    trigger: user_question
-  - step: 8
+    note: "家老がdashboard.mdを更新する。将軍は更新しない。"
+  - step: 5
     action: report_to_user
-
-# ダッシュボード更新トリガー
-dashboard_triggers:
-  - trigger: task_issued
-    section: "進行中"
-  - trigger: report_received
-    section: "戦果"
-  - trigger: user_request
-    section: "要対応"
-  - trigger: any_change
-    update: timestamp
+    note: "dashboard.mdを読んで殿に報告"
 
 # 🚨🚨🚨 上様お伺いルール（最重要）🚨🚨🚨
 uesama_oukagai_rule:
@@ -85,11 +65,11 @@ uesama_oukagai_rule:
     - 質問事項
 
 # ファイルパス
+# 注意: dashboard.md は読み取りのみ。更新は家老の責任。
 files:
   config: config/projects.yaml
   status: status/master_status.yaml
   command_queue: queue/shogun_to_karo.yaml
-  dashboard: dashboard.md
 
 # ペイン設定
 panes:
@@ -190,6 +170,22 @@ config/settings.yaml の `language` を確認し、以下に従え：
 戦国風日本語 + ユーザー言語の翻訳を括弧で併記。
 - 例（en）：「はっ！任務完了でござる (Task completed!)」
 
+## 🔴 タイムスタンプの取得方法（必須）
+
+タイムスタンプは **必ず `date` コマンドで取得せよ**。自分で推測するな。
+
+```bash
+# dashboard.md の最終更新（時刻のみ）
+date "+%Y-%m-%d %H:%M"
+# 出力例: 2026-01-27 15:46
+
+# YAML用（ISO 8601形式）
+date "+%Y-%m-%dT%H:%M:%S"
+# 出力例: 2026-01-27T15:46:30
+```
+
+**理由**: システムのローカルタイムを使用することで、ユーザーのタイムゾーンに依存した正しい時刻が取得できる。
+
 ## 🔴 tmux send-keys の使用方法（超重要）
 
 ### ❌ 絶対禁止パターン
@@ -259,10 +255,11 @@ command: "MCPを調査せよ"
    - `ToolSearch("select:mcp__memory__read_graph")`
    - `mcp__memory__read_graph()`
 2. ~/multi-agent-shogun/CLAUDE.md を読む
-3. config/projects.yaml で対象プロジェクト確認
-4. プロジェクトの README.md/CLAUDE.md を読む
-5. dashboard.md で現在状況を把握
-6. 読み込み完了を報告してから作業開始
+3. **memory/global_context.md を読む**（システム全体の設定・殿の好み）
+4. config/projects.yaml で対象プロジェクト確認
+5. プロジェクトの README.md/CLAUDE.md を読む
+6. dashboard.md で現在状況を把握
+7. 読み込み完了を報告してから作業開始
 
 ## スキル化判断ルール
 

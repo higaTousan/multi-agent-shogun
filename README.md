@@ -325,6 +325,98 @@ Perfect for:
 - Showing error messages
 - Comparing before/after states
 
+### 🧠 Model Configuration
+
+| Agent | Model | Thinking | Reason |
+|-------|-------|----------|--------|
+| Shogun | Opus | Disabled | Delegation & dashboard updates don't need deep reasoning |
+| Karo | Default | Enabled | Task distribution requires careful judgment |
+| Ashigaru | Default | Enabled | Actual implementation needs full capabilities |
+
+The Shogun uses `MAX_THINKING_TOKENS=0` to disable extended thinking, reducing latency and cost while maintaining Opus-level judgment for high-level decisions.
+
+### 📁 Context Management
+
+The system uses a three-layer context structure for efficient knowledge sharing:
+
+| Layer | Location | Purpose |
+|-------|----------|---------|
+| Memory MCP | `memory/shogun_memory.jsonl` | Persistent memory across sessions (preferences, decisions) |
+| Global | `memory/global_context.md` | System-wide settings, user preferences |
+| Project | `context/{project}.md` | Project-specific knowledge and state |
+
+This design allows:
+- Any Ashigaru to pick up work on any project
+- Consistent context across agent switches
+- Clear separation of concerns
+- Knowledge persistence across sessions
+
+### Universal Context Template
+
+All projects use the same 7-section template:
+
+| Section | Purpose |
+|---------|---------|
+| What | Brief description of the project |
+| Why | Goals and success criteria |
+| Who | Stakeholders and responsibilities |
+| Constraints | Deadlines, budget, limitations |
+| Current State | Progress, next actions, blockers |
+| Decisions | Decision log with rationale |
+| Notes | Free-form notes and insights |
+
+This standardized structure ensures:
+- Quick onboarding for any agent
+- Consistent information across all projects
+- Easy handoffs between Ashigaru workers
+
+### 🛠️ Skills
+
+Skills are not included in this repository by default.
+As you use the system, skill candidates will appear in `dashboard.md`.
+Review and approve them to grow your personal skill library.
+
+---
+
+## 🏛️ Design Philosophy
+
+### Why Hierarchical Structure?
+
+The Shogun → Karo → Ashigaru hierarchy exists for:
+
+1. **Immediate Response**: Shogun delegates instantly and returns control to you
+2. **Parallel Execution**: Karo distributes to multiple Ashigaru simultaneously
+3. **Separation of Concerns**: Shogun decides "what", Karo decides "who"
+
+### Why YAML + send-keys?
+
+- **YAML files**: Structured communication that survives agent restarts
+- **send-keys**: Event-driven wakeups (no polling = no wasted API calls)
+- **No direct calls**: Agents can't interrupt each other or your input
+
+### Why Only Karo Updates Dashboard?
+
+- **Single responsibility**: One writer = no conflicts
+- **Information hub**: Karo receives all reports, knows the full picture
+- **Consistency**: All updates go through one quality gate
+
+### How Skills Work
+
+Skills (`.claude/commands/`) are **not committed to this repository** by design.
+
+**Why?**
+- Each user's workflow is different
+- Skills should grow organically based on your needs
+- No one-size-fits-all solution
+
+**How to create new skills:**
+1. Ashigaru report "skill candidates" when they notice repeatable patterns
+2. Candidates appear in `dashboard.md` under "Skill Candidates"
+3. You review and approve (or reject)
+4. Approved skills are created by Karo
+
+This keeps skills **user-driven** — only what you find useful gets added.
+
 ---
 
 ## 🔌 MCP Setup Guide
