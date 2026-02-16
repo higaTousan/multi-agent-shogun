@@ -1,5 +1,5 @@
 ---
-name: agent-status
+name: shogun-agent-status
 description: 全エージェント（家老・足軽1-7・軍師）の稼働状態を一覧表示するスキル。tmux pane状態（稼働中/待機中/不在）とタスクYAML状態（task_id, status）と未読inbox数を統合表示。「稼働確認」「エージェント状態」「布陣確認」「agent status」で起動。
 ---
 

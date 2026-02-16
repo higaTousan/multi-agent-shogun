@@ -125,8 +125,8 @@
 !skills/
 !skills/skill-creator/
 !skills/skill-creator/SKILL.md
-!skills/agent-status/
-!skills/agent-status/SKILL.md
+!skills/shogun-agent-status/
+!skills/shogun-agent-status/SKILL.md
 
 # Tests
 !tests/
