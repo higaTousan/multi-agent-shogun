@@ -896,3 +896,182 @@ except Exception:
 
     echo "$result"
 }
+
+# find_agent_for_model() — Issue #53 Phase 2
+# 指定モデルを使用している空き足軽を探す。
+#
+# 核心設計原則（殿の方針）:
+#   - ビジーペイン: 絶対に触らない（作業中断・データ消失リスク）
+#   - アイドルペイン: CLI切り替えOK（停止→起動）
+#   例) Codex 5.3が必要でClaude CodeしかアイドルならClaude Codeに降格OK
+#   例) Claude Codeが必要でCodexしかアイドルなら、CodexをkillしてClaude Codeを起動OK
+#   CLI切り替えの実際の再起動処理はkaro.mdが担当（この関数はagent_idを返すのみ）
+#
+# 引数:
+#   $1: recommended_model — get_recommended_model() の返り値
+#
+# 返り値:
+#   空き足軽ID (例: "ashigaru4") — 完全一致またはフォールバック
+#   全員ビジー → "QUEUE"
+#   エラー → "" (空文字)
+#
+# 使用例:
+#   agent=$(find_agent_for_model "claude-sonnet-4-6")
+#   case "$agent" in
+#     QUEUE) echo "待機キューに積む" ;;
+#     "")    echo "エラー" ;;
+#     *)     echo "足軽: $agent に振る（karo.mdがCLI切り替えを判断）" ;;
+#   esac
+find_agent_for_model() {
+    local recommended_model="$1"
+
+    if [[ -z "$recommended_model" ]]; then
+        return 1
+    fi
+
+    local settings="${CLI_ADAPTER_SETTINGS:-${CLI_ADAPTER_PROJECT_ROOT}/config/settings.yaml}"
+
+    # settings.yaml の cli.agents から recommended_model を使用する足軽を抽出
+    local candidates
+    candidates=$("$CLI_ADAPTER_PROJECT_ROOT/.venv/bin/python3" -c "
+import yaml, sys
+
+try:
+    with open('${settings}') as f:
+        cfg = yaml.safe_load(f) or {}
+    cli_cfg = cfg.get('cli', {})
+    agents = cli_cfg.get('agents', {})
+
+    results = []
+    for agent_id, spec in agents.items():
+        # 足軽のみ対象（karo, gunshi, shogunは除外）
+        if not agent_id.startswith('ashigaru'):
+            continue
+        if not isinstance(spec, dict):
+            continue
+        agent_model = spec.get('model', '')
+        if agent_model == '${recommended_model}':
+            results.append(agent_id)
+
+    # 番号順にソート（ashigaru1, ashigaru2, ...）
+    results.sort(key=lambda x: int(x.replace('ashigaru', '')) if x.replace('ashigaru', '').isdigit() else 99)
+    print(' '.join(results))
+except Exception:
+    pass
+" 2>/dev/null)
+
+    # 候補足軽を順番にチェック（空きを探す）
+    # agent_status.sh の agent_is_busy_check を再利用
+    local agent_status_lib="${CLI_ADAPTER_PROJECT_ROOT}/lib/agent_status.sh"
+
+    if [[ -f "$agent_status_lib" ]]; then
+        if ! declare -f agent_is_busy_check >/dev/null 2>&1; then
+            # shellcheck disable=SC1090
+            source "$agent_status_lib" 2>/dev/null
+        fi
+    fi
+
+    local candidate
+    for candidate in $candidates; do
+        # tmux pane ターゲットを @agent_id で逆引き
+        local pane_target
+        pane_target=$(tmux list-panes -a -F '#{session_name}:#{window_index}.#{pane_index} #{@agent_id}' 2>/dev/null \
+            | awk -v agent="$candidate" '$2 == agent {print $1}' | head -1)
+
+        if [[ -z "$pane_target" ]]; then
+            # tmuxセッションが存在しない（ユニットテスト環境等）→ 候補をそのまま返す
+            echo "$candidate"
+            return 0
+        fi
+
+        # ビジー判定
+        if declare -f agent_is_busy_check >/dev/null 2>&1; then
+            local busy_rc
+            agent_is_busy_check "$pane_target" 2>/dev/null
+            busy_rc=$?
+            # 0=busy, 1=idle, 2=not_found
+            if [[ $busy_rc -eq 1 ]]; then
+                echo "$candidate"
+                return 0
+            fi
+        else
+            # agent_is_busy_check が使えない場合は最初の候補を返す（フォールバック）
+            echo "$candidate"
+            return 0
+        fi
+    done
+
+    # フェーズ2: 完全一致が全員ビジー → 任意のアイドル足軽にフォールバック
+    # 殿の方針: 「Codex 5.3が欲しくて Claude Code しか空いていなければ Claude Code で可」
+    # kill/restart は絶対しない。アイドルペインを再利用する。
+    local all_agents
+    all_agents=$("$CLI_ADAPTER_PROJECT_ROOT/.venv/bin/python3" -c "
+import yaml
+
+try:
+    with open('${settings}') as f:
+        cfg = yaml.safe_load(f) or {}
+    agents = cfg.get('cli', {}).get('agents', {})
+    results = [k for k in agents if k.startswith('ashigaru')]
+    results.sort(key=lambda x: int(x.replace('ashigaru', '')) if x.replace('ashigaru', '').isdigit() else 99)
+    print(' '.join(results))
+except Exception:
+    pass
+" 2>/dev/null)
+
+    local fallback
+    for fallback in $all_agents; do
+        # 既に candidates でチェック済みはスキップ
+        if [[ " $candidates " == *" $fallback "* ]]; then
+            continue
+        fi
+
+        local fb_pane
+        fb_pane=$(tmux list-panes -a -F '#{session_name}:#{window_index}.#{pane_index} #{@agent_id}' 2>/dev/null \
+            | awk -v agent="$fallback" '$2 == agent {print $1}' | head -1)
+
+        if [[ -z "$fb_pane" ]]; then
+            # tmuxセッションなし（テスト環境）→ フォールバック候補を返す
+            echo "$fallback"
+            return 0
+        fi
+
+        if declare -f agent_is_busy_check >/dev/null 2>&1; then
+            agent_is_busy_check "$fb_pane" 2>/dev/null
+            local fb_rc=$?
+            if [[ $fb_rc -eq 1 ]]; then
+                echo "$fallback"
+                return 0
+            fi
+        fi
+    done
+
+    # 全足軽ビジー → キュー待ち
+    echo "QUEUE"
+    return 0
+}
+
+# get_ashigaru_ids()
+# settings.yaml の cli.agents から足軽ID一覧を返す（スペース区切り、番号順）
+# フォールバック: "ashigaru1 ashigaru2 ashigaru3 ashigaru4 ashigaru5 ashigaru6 ashigaru7"
+get_ashigaru_ids() {
+    local settings="${CLI_ADAPTER_SETTINGS:-${CLI_ADAPTER_PROJECT_ROOT}/config/settings.yaml}"
+    local result
+    result=$("$CLI_ADAPTER_PROJECT_ROOT/.venv/bin/python3" -c "
+import yaml
+try:
+    with open('${settings}') as f:
+        cfg = yaml.safe_load(f) or {}
+    agents = cfg.get('cli', {}).get('agents', {})
+    results = [k for k in agents if k.startswith('ashigaru')]
+    results.sort(key=lambda x: int(x.replace('ashigaru', '')) if x.replace('ashigaru', '').isdigit() else 99)
+    print(' '.join(results))
+except Exception:
+    pass
+" 2>/dev/null)
+    if [[ -n "$result" ]]; then
+        echo "$result"
+    else
+        echo "ashigaru1 ashigaru2 ashigaru3 ashigaru4 ashigaru5 ashigaru6 ashigaru7"
+    fi
+}

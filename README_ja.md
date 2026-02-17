@@ -64,14 +64,15 @@
 
 多くのマルチエージェントフレームワークは、連携のためにAPIトークンを消費します。Shogunは違います。
 
-| | Claude Code `Task` ツール | LangGraph | CrewAI | **multi-agent-shogun** |
-|---|---|---|---|---|
-| **アーキテクチャ** | 1プロセス内のサブエージェント | グラフベースの状態機械 | ロールベースエージェント | tmux経由の階層構造 |
-| **並列性** | 逐次実行（1つずつ） | 並列ノード（v0.2+） | 限定的 | **8体の独立エージェント** |
-| **連携コスト** | TaskごとにAPIコール | API + インフラ（Postgres/Redis） | API + CrewAIプラットフォーム | **ゼロ**（YAML + tmux） |
-| **可観測性** | Claudeのログのみ | LangSmith連携 | OpenTelemetry | **ライブtmuxペイン** + ダッシュボード |
-| **スキル発見** | なし | なし | なし | **ボトムアップ自動提案** |
-| **セットアップ** | Claude Code内蔵 | 重い（インフラ必要） | pip install | シェルスクリプト |
+| | Claude Code `Task` ツール | Claude Code Agent Teams | LangGraph | CrewAI | **multi-agent-shogun** |
+|---|---|---|---|---|---|
+| **アーキテクチャ** | 1プロセス内のサブエージェント | リード+チームメイト（JSONメールボックス） | グラフベースの状態機械 | ロールベースエージェント | tmux経由の階層構造 |
+| **並列性** | 逐次実行（1つずつ） | 複数の独立セッション | 並列ノード（v0.2+） | 限定的 | **8体の独立エージェント** |
+| **連携コスト** | TaskごとにAPIコール | 高い（各チームメイト=別コンテキスト） | API + インフラ（Postgres/Redis） | API + CrewAIプラットフォーム | **ゼロ**（YAML + tmux） |
+| **Multi-CLI** | Claude Codeのみ | Claude Codeのみ | 任意のLLM API | 任意のLLM API | **4 CLI**（Claude/Codex/Copilot/Kimi） |
+| **可観測性** | Claudeのログのみ | tmux分割ペインまたはインプロセス | LangSmith連携 | OpenTelemetry | **ライブtmuxペイン** + ダッシュボード |
+| **スキル発見** | なし | なし | なし | なし | **ボトムアップ自動提案** |
+| **セットアップ** | Claude Code内蔵 | 内蔵（実験的） | 重い（インフラ必要） | pip install | シェルスクリプト |
 
 ### 他のフレームワークとの違い
 
@@ -557,7 +558,45 @@ Step 3: エージェントが自分のinboxを読む
 - **待機中のCPU使用率ゼロ** — `inotifywait` はカーネルイベントでブロック（ポーリングループではない）。メッセージ間のCPUは0%。
 - **配信保証** — ファイル書き込みが成功すれば、メッセージは確実にそこにある。消失なし、リトライ不要。
 
-### 📸 5. スクリーンショット連携
+### 📊 5. エージェント稼働確認
+
+どのエージェントが稼働中か待機中か — コマンド1つで即座に確認：
+
+```bash
+# プロジェクトモード: タスク/inbox情報付きフルステータス
+bash scripts/agent_status.sh
+
+# スタンドアロンモード: 任意のtmuxセッションで動作
+bash scripts/agent_status.sh --session mysession --lang en
+```
+
+**プロジェクトモード出力:**
+```
+Agent      CLI     Pane      Task ID                                    Status     Inbox
+---------- ------- --------- ------------------------------------------ ---------- -----
+karo       claude  待機中    ---                                        ---        0
+ashigaru1  codex   稼働中    subtask_042a_research                      assigned   0
+ashigaru2  codex   待機中    subtask_042b_review                        done       0
+gunshi     claude  稼働中    subtask_042c_analysis                      assigned   0
+```
+
+**スタンドアロンモード出力**（プロジェクト設定不要）:
+```
+Pane                           State      Agent ID
+------------------------------ ---------- ----------
+multiagent:agents.0            IDLE       karo
+multiagent:agents.1            BUSY       ashigaru1
+multiagent:agents.8            BUSY       gunshi
+```
+
+判定は **Claude Code** と **Codex CLI** の両方に対応。各tmuxペインの末尾5行からCLI固有のプロンプト/スピナーパターンを検出。判定ロジックは `lib/agent_status.sh` に分離されており、自作スクリプトからも利用可能：
+
+```bash
+source lib/agent_status.sh
+agent_is_busy_check "multiagent:agents.3" && echo "稼働中" || echo "待機中"
+```
+
+### 📸 6. スクリーンショット連携
 
 VSCode拡張のClaude Codeはスクショを貼り付けて事象を説明できます。このCLIシステムでも同等の機能を実現：
 
@@ -579,7 +618,7 @@ screenshot:
 - エラーメッセージを見せる
 - 変更前後の状態を比較
 
-### 📁 6. コンテキスト管理
+### 📁 7. コンテキスト管理
 
 効率的な知識共有のため、四層構造のコンテキストを採用：
 
@@ -628,7 +667,7 @@ screenshot:
 - すべてのプロジェクトで一貫した情報管理
 - 足軽間の作業引き継ぎが容易
 
-### 📱 7. スマホ通知（ntfy）
+### 📱 8. スマホ通知（ntfy）
 
 スマホと将軍の間で双方向通信 — SSH不要、Tailscale不要、サーバ不要。
 
@@ -724,7 +763,7 @@ bash scripts/ntfy_listener.sh
 - **Eat the Frog** 🐸: その日の最も難しいタスクを「カエル」としてマーク。完了すると特別な祝福通知が送信される
 - **日次進捗**: `12/12 tasks today` — 視覚的な完了フィードバックがArbeitslust効果（仕事の進捗による喜び）を強化
 
-### 🖼️ 8. ペインボーダータスク表示
+### 🖼️ 9. ペインボーダータスク表示
 
 各tmuxペインのボーダーにエージェントの現在のタスクを表示：
 
@@ -745,7 +784,7 @@ bash scripts/ntfy_listener.sh
 - 家老がタスク割当・完了時に自動更新
 - 9ペインを一目見れば、誰が何をしているか即座にわかる
 
-### 🔊 9. シャウトモード（戦国エコー）
+### 🔊 10. シャウトモード（戦国エコー）
 
 足軽がタスクを完了すると、パーソナライズされた戦国風の叫びをtmuxペインに表示します — 部下が働いている実感を得られる。
 
@@ -913,6 +952,37 @@ task:
 
 ブロック元のタスクが完了すると、家老が自動的に依存タスクのブロックを解除し、空いている足軽に割り当てます。これにより待機時間が削減され、依存タスクの効率的なパイプライン処理が可能になります。
 
+### 動的モデルルーティング（capability_tiers）
+
+エージェント単位のルーティングに加え、**足軽階層内でのモデルレベルルーティング**も設定できます。`config/settings.yaml` に `capability_tiers` テーブルを定義し、各モデルのBloom上限を指定します：
+
+```yaml
+capability_tiers:
+  gpt-5.3-codex-spark:
+    max_bloom: 3       # L1–L3: 高速・大量処理タスク
+    cost_group: chatgpt_pro
+  gpt-5.3-codex:
+    max_bloom: 4       # L1–L4: + 分析・デバッグ
+    cost_group: chatgpt_pro
+  claude-sonnet-4-6:
+    max_bloom: 5       # L1–L5: + 設計評価
+    cost_group: claude_max
+  claude-opus-4-6:
+    max_bloom: 6       # L1–L6: + 新規アーキテクチャ・戦略
+    cost_group: claude_max
+```
+
+`cost_group` フィールドで各モデルをサブスクリプションプランに紐付け、契約外のモデルへのルーティングを防止します。
+
+設定を支援する2つの組み込みスキルがあります：
+
+| スキル | 用途 |
+|--------|------|
+| `/shogun-model-list` | 全モデル × サブスクリプション × Bloom上限の参照テーブル |
+| `/shogun-bloom-config` | 対話式: 2つの質問に答えるだけで最適な `capability_tiers` YAMLを生成 |
+
+セットアップ後に `/shogun-bloom-config` を実行して、最適な `capability_tiers` 設定を生成してください。
+
 ---
 
 ## 🧭 核心思想（Philosophy）
@@ -985,9 +1055,20 @@ tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'
 
 スキルは `/スキル名` で呼び出し可能。将軍に「/スキル名 を実行」と伝えるだけ。
 
+### 同梱スキル（リポジトリにコミット済み）
+
+`skills/` ディレクトリに2つのスキルが同梱されています。どのユーザにも有用なセットアップユーティリティです：
+
+| スキル | 説明 |
+|--------|------|
+| `/shogun-model-list` | 全CLIツール × モデル × サブスクリプション × Bloom上限の参照テーブル |
+| `/shogun-bloom-config` | 対話式設定: 2つの質問に答えるだけで `capability_tiers` YAMLを生成 |
+
+これらは意図的にシンプルに設計されています — システムの設定を助けるものであり、業務を代行するものではありません。
+
 ### スキルの思想
 
-**1. スキルはコミット対象外**
+**1. 個人スキルはコミット対象外**
 
 `.claude/commands/` 配下のスキルはリポジトリにコミットしない設計。理由：
 - 各ユーザの業務・ワークフローは異なる
@@ -1292,10 +1373,12 @@ multi-agent-shogun/
 │       └── copilot_tools.md  # GitHub Copilot CLI ツール・機能
 │
 ├── lib/
+│   ├── agent_status.sh       # 共有 稼働/待機 判定（Claude Code + Codex）
 │   ├── cli_adapter.sh        # Multi-CLIアダプタ（Claude/Codex/Copilot/Kimi）
 │   └── ntfy_auth.sh          # ntfy認証ヘルパー
 │
 ├── scripts/                  # ユーティリティスクリプト
+│   ├── agent_status.sh       # 全エージェントの稼働/待機状態を表示
 │   ├── inbox_write.sh        # エージェントinboxへのメッセージ書き込み
 │   ├── inbox_watcher.sh      # inotifywaitでinbox変更を監視
 │   ├── ntfy.sh               # スマホにプッシュ通知を送信
@@ -1499,6 +1582,14 @@ tmux respawn-pane -t shogun:0.0 -k 'claude --model opus --dangerously-skip-permi
 - **E2Eテストスイート（19テスト、7シナリオ）** — モックCLIフレームワークが分離されたtmuxセッションでエージェント動作をシミュレート。基本フロー、inbox配信、/clearリカバリ、エスカレーション、redo、並列タスク、blocked_by依存関係をカバー
 - **Stop hook inbox配信** — Claude Codeエージェントが `.claude/settings.json` のStop hookでターン終了時に自動的にinboxを確認。`send-keys` 割り込み問題を根絶
 - **モデルデフォルト更新** — 家老: Opus→Sonnet。全足軽: Sonnet（統一）。軍師: Opus（深い推論）
+
+## v3.3.2の新機能 — GPT-5.3-Codex-Spark対応
+
+> **新モデル、同じYAML。** `settings.yaml` の任意のCodexエージェントに `model: gpt-5.3-codex-spark` を追加するだけ。
+
+- **Codex `--model` フラグ対応** — `build_cli_command()` が `settings.yaml` のモデル設定を `--model` フラグ経由でCodex CLIに渡す。`gpt-5.3-codex-spark` と今後のCodexモデルに対応
+- **独立レート制限** — SparkはGPT-5.3-Codexとは独立したレート制限枠で動作。異なる足軽に両モデルを割り当てれば**実効スループットが2倍**に
+- **起動時表示** — `shutsujin_departure.sh` が汎用的なエフォートレベルの代わりに実際のモデル名（例: `codex/gpt-5.3-codex-spark`）を表示
 
 <details>
 <summary><b>v3.0の機能 — Multi-CLI</b></summary>

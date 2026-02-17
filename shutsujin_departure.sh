@@ -60,6 +60,14 @@ else
     CLI_ADAPTER_LOADED=false
 fi
 
+# 足軽IDリストと人数を動的に取得（settings.yaml から）
+if [ "$CLI_ADAPTER_LOADED" = true ]; then
+    _ASHIGARU_IDS_STR=$(get_ashigaru_ids)
+else
+    _ASHIGARU_IDS_STR="ashigaru1 ashigaru2 ashigaru3 ashigaru4 ashigaru5 ashigaru6 ashigaru7"
+fi
+_ASHIGARU_COUNT=$(echo "$_ASHIGARU_IDS_STR" | wc -w | tr -d ' ')
+
 # 色付きログ関数（戦国風）
 log_info() {
     echo -e "\033[1;33m【報】\033[0m $1"
@@ -345,7 +353,7 @@ if [ "$CLEAN_MODE" = true ]; then
     log_info "📜 前回の軍議記録を破棄中..."
 
     # 足軽タスクファイルリセット
-    for i in {1..7}; do
+    for i in $(seq 1 "$_ASHIGARU_COUNT"); do
         cat > ./queue/tasks/ashigaru${i}.yaml << EOF
 # 足軽${i}専用タスクファイル
 task:
@@ -371,7 +379,7 @@ task:
 EOF
 
     # 足軽レポートファイルリセット
-    for i in {1..7}; do
+    for i in $(seq 1 "$_ASHIGARU_COUNT"); do
         cat > ./queue/reports/ashigaru${i}_report.yaml << EOF
 worker_id: ashigaru${i}
 task_id: null
@@ -394,7 +402,7 @@ EOF
     echo "inbox:" > ./queue/ntfy_inbox.yaml
 
     # agent inbox リセット
-    for agent in shogun karo ashigaru{1..7} gunshi; do
+    for agent in shogun karo $_ASHIGARU_IDS_STR gunshi; do
         echo "messages:" > "./queue/inbox/${agent}.yaml"
     done
 
@@ -569,30 +577,34 @@ tmux select-pane -t "multiagent:agents.$((PANE_BASE+6))"
 tmux split-window -v
 tmux split-window -v
 
-# ペインラベル設定（プロンプト用: モデル名なし）
-PANE_LABELS=("karo" "ashigaru1" "ashigaru2" "ashigaru3" "ashigaru4" "ashigaru5" "ashigaru6" "ashigaru7" "gunshi")
-# ペインタイトル設定（tmuxタイトル用: モデル名付き）
-if [ "$KESSEN_MODE" = true ]; then
-    PANE_TITLES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
-else
-    PANE_TITLES=("Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus")
-fi
-# 色設定（karo: 赤, ashigaru: 青, gunshi: 黄）
-PANE_COLORS=("red" "blue" "blue" "blue" "blue" "blue" "blue" "blue" "yellow")
+# ペインラベル・エージェントID・色設定 — settings.yaml から動的に構築
+PANE_LABELS=("karo")
+AGENT_IDS=("karo")
+PANE_COLORS=("red")
+for _ai in $_ASHIGARU_IDS_STR; do
+    PANE_LABELS+=("$_ai")
+    AGENT_IDS+=("$_ai")
+    PANE_COLORS+=("blue")
+done
+PANE_LABELS+=("gunshi")
+AGENT_IDS+=("gunshi")
+PANE_COLORS+=("yellow")
 
-AGENT_IDS=("karo" "ashigaru1" "ashigaru2" "ashigaru3" "ashigaru4" "ashigaru5" "ashigaru6" "ashigaru7" "gunshi")
-
-# モデル名設定（pane-border-format で常時表示するため）
-# デフォルト（Claude用）
-if [ "$KESSEN_MODE" = true ]; then
-    MODEL_NAMES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
-else
-    MODEL_NAMES=("Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus")
-fi
+# モデル名設定（pane-border-format で常時表示するため）- 動的構築
+MODEL_NAMES=()
+for _ai in "${AGENT_IDS[@]}"; do
+    if [[ "$_ai" == "gunshi" ]]; then
+        MODEL_NAMES+=("Opus")
+    elif [ "$KESSEN_MODE" = true ]; then
+        MODEL_NAMES+=("Opus")
+    else
+        MODEL_NAMES+=("Sonnet")
+    fi
+done
 
 # CLI Adapter経由でモデル名を動的に上書き
 if [ "$CLI_ADAPTER_LOADED" = true ]; then
-    for i in {0..8}; do
+    for i in "${!AGENT_IDS[@]}"; do
         _agent="${AGENT_IDS[$i]}"
         _cli=$(get_cli_type "$_agent")
         case "$_cli" in
@@ -624,7 +636,7 @@ if [ "$CLI_ADAPTER_LOADED" = true ]; then
     done
 fi
 
-for i in {0..8}; do
+for i in "${!AGENT_IDS[@]}"; do
     p=$((PANE_BASE + i))
     tmux select-pane -t "multiagent:agents.${p}" -T "${MODEL_NAMES[$i]}"
     tmux set-option -p -t "multiagent:agents.${p}" @agent_id "${AGENT_IDS[$i]}"
@@ -708,7 +720,7 @@ if [ "$SETUP_ONLY" = false ]; then
 
     if [ "$KESSEN_MODE" = true ]; then
         # 決戦の陣: CLI Adapter経由（claudeはOpus強制）
-        for i in {1..7}; do
+        for i in $(seq 1 "$_ASHIGARU_COUNT"); do
             p=$((PANE_BASE + i))
             _ashi_cli_type="claude"
             _ashi_cmd="claude --model opus --dangerously-skip-permissions"
@@ -729,10 +741,10 @@ if [ "$SETUP_ONLY" = false ]; then
             tmux send-keys -t "multiagent:agents.${p}" "$_ashi_cmd"
             tmux send-keys -t "multiagent:agents.${p}" Enter
         done
-        log_info "  └─ 足軽1-7（決戦の陣）、召喚完了"
+        log_info "  └─ 足軽1-${_ASHIGARU_COUNT}（決戦の陣）、召喚完了"
     else
         # 平時の陣: CLI Adapter経由（デフォルト: 全足軽=Sonnet）
-        for i in {1..7}; do
+        for i in $(seq 1 "$_ASHIGARU_COUNT"); do
             p=$((PANE_BASE + i))
             _ashi_cli_type="claude"
             _ashi_cmd="claude --model sonnet --dangerously-skip-permissions"
@@ -749,11 +761,11 @@ if [ "$SETUP_ONLY" = false ]; then
             tmux send-keys -t "multiagent:agents.${p}" "$_ashi_cmd"
             tmux send-keys -t "multiagent:agents.${p}" Enter
         done
-        log_info "  └─ 足軽1-7（平時の陣）、召喚完了"
+        log_info "  └─ 足軽1-${_ASHIGARU_COUNT}（平時の陣）、召喚完了"
     fi
 
-    # 軍師（pane 8）: Opus Thinking — 戦略立案・設計判断専任
-    p=$((PANE_BASE + 8))
+    # 軍師（pane _ASHIGARU_COUNT+1）: Opus Thinking — 戦略立案・設計判断専任
+    p=$((PANE_BASE + _ASHIGARU_COUNT + 1))
     _gunshi_cli_type="claude"
     _gunshi_cmd="claude --model opus --dangerously-skip-permissions"
     if [ "$CLI_ADAPTER_LOADED" = true ]; then
@@ -866,7 +878,7 @@ NINJA_EOF
 
     # inbox ディレクトリ初期化（シンボリックリンク先のLinux FSに作成）
     mkdir -p "$SCRIPT_DIR/logs"
-    for agent in shogun karo ashigaru{1..7} gunshi; do
+    for agent in shogun karo $_ASHIGARU_IDS_STR gunshi; do
         [ -f "$SCRIPT_DIR/queue/inbox/${agent}.yaml" ] || echo "messages:" > "$SCRIPT_DIR/queue/inbox/${agent}.yaml"
     done
 
@@ -891,7 +903,7 @@ NINJA_EOF
     disown
 
     # 足軽のwatcher
-    for i in {1..7}; do
+    for i in $(seq 1 "$_ASHIGARU_COUNT"); do
         p=$((PANE_BASE + i))
         _ashi_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${p}" -v @agent_cli 2>/dev/null || echo "claude")
         nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" "ashigaru${i}" "multiagent:agents.${p}" "$_ashi_watcher_cli" \
@@ -900,13 +912,13 @@ NINJA_EOF
     done
 
     # 軍師のwatcher
-    p=$((PANE_BASE + 8))
+    p=$((PANE_BASE + _ASHIGARU_COUNT + 1))
     _gunshi_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${p}" -v @agent_cli 2>/dev/null || echo "claude")
     nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" "gunshi" "multiagent:agents.${p}" "$_gunshi_watcher_cli" \
         >> "$SCRIPT_DIR/logs/inbox_watcher_gunshi.log" 2>&1 &
     disown
 
-    log_success "  └─ 10エージェント分のinbox_watcher起動完了（将軍+家老+足軽7+軍師）"
+    log_success "  └─ $((_ASHIGARU_COUNT + 3))エージェント分のinbox_watcher起動完了（将軍+家老+足軽${_ASHIGARU_COUNT}+軍師）"
 
     # STEP 6.7 は廃止 — CLAUDE.md Session Start (step 1: tmux agent_id) で各自が自律的に
     # 自分のinstructions/*.mdを読み込む。検証済み (2026-02-08)。

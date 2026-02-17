@@ -95,6 +95,7 @@
 !scripts/seo_qc.sh
 !scripts/stop_hook_inbox.sh
 !scripts/agent_status.sh
+!scripts/ratelimit_check.sh
 
 
 # SayTask (sample template only, not actual data)
@@ -125,12 +126,16 @@
 !images/screenshots/hero/latest-translucent-20260210-190453.png
 !images/screenshots/hero/latest-translucent-20260208-084602.png
 
-# Skills (skill-creator only)
+# Skills (public OSS skills committed to repo)
 !skills/
 !skills/skill-creator/
 !skills/skill-creator/SKILL.md
 !skills/shogun-agent-status/
 !skills/shogun-agent-status/SKILL.md
+!skills/shogun-model-list/
+!skills/shogun-model-list/SKILL.md
+!skills/shogun-bloom-config/
+!skills/shogun-bloom-config/SKILL.md
 
 # Test specs
 !tests/specs/
@@ -139,6 +144,9 @@
 # Tests
 !tests/
 !tests/*.bats
+!tests/*.sh
+!tests/fixtures/
+!tests/fixtures/*.yaml
 !tests/unit/
 !tests/unit/*.bats
 !tests/integration/

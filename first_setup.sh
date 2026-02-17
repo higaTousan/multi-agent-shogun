@@ -641,8 +641,29 @@ RESULTS+=("設定ファイル: OK")
 # ============================================================
 log_step "STEP 8: キューファイル初期化"
 
+# 足軽数を settings.yaml から動的に取得（設定がなければデフォルト7）
+_SETUP_VENV_PYTHON="$SCRIPT_DIR/.venv/bin/python3"
+_SETUP_ASHIGARU_COUNT=$(
+    if [[ -x "$_SETUP_VENV_PYTHON" ]]; then
+        "$_SETUP_VENV_PYTHON" -c "
+import yaml
+try:
+    with open('$SCRIPT_DIR/config/settings.yaml') as f:
+        cfg = yaml.safe_load(f) or {}
+    agents = cfg.get('cli', {}).get('agents', {})
+    count = len([k for k in agents if k.startswith('ashigaru')])
+    print(count if count > 0 else 7)
+except Exception:
+    print(7)
+" 2>/dev/null
+    else
+        echo 7
+    fi
+)
+_SETUP_ASHIGARU_COUNT=${_SETUP_ASHIGARU_COUNT:-7}
+
 # 足軽用タスクファイル作成
-for i in {1..8}; do
+for i in $(seq 1 "$_SETUP_ASHIGARU_COUNT"); do
     TASK_FILE="$SCRIPT_DIR/queue/tasks/ashigaru${i}.yaml"
     if [ ! -f "$TASK_FILE" ]; then
         cat > "$TASK_FILE" << EOF
@@ -657,10 +678,10 @@ task:
 EOF
     fi
 done
-log_info "足軽タスクファイル (1-8) を確認/作成しました"
+log_info "足軽タスクファイル (1-${_SETUP_ASHIGARU_COUNT}) を確認/作成しました"
 
 # 足軽用レポートファイル作成
-for i in {1..8}; do
+for i in $(seq 1 "$_SETUP_ASHIGARU_COUNT"); do
     REPORT_FILE="$SCRIPT_DIR/queue/reports/ashigaru${i}_report.yaml"
     if [ ! -f "$REPORT_FILE" ]; then
         cat > "$REPORT_FILE" << EOF
@@ -672,7 +693,7 @@ result: null
 EOF
     fi
 done
-log_info "足軽レポートファイル (1-8) を確認/作成しました"
+log_info "足軽レポートファイル (1-${_SETUP_ASHIGARU_COUNT}) を確認/作成しました"
 
 RESULTS+=("キューファイル: OK")
 
