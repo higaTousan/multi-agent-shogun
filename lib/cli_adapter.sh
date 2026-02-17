@@ -1050,3 +1050,28 @@ except Exception:
     echo "QUEUE"
     return 0
 }
+
+# get_ashigaru_ids()
+# settings.yaml の cli.agents から足軽ID一覧を返す（スペース区切り、番号順）
+# フォールバック: "ashigaru1 ashigaru2 ashigaru3 ashigaru4 ashigaru5 ashigaru6 ashigaru7"
+get_ashigaru_ids() {
+    local settings="${CLI_ADAPTER_SETTINGS:-${CLI_ADAPTER_PROJECT_ROOT}/config/settings.yaml}"
+    local result
+    result=$("$CLI_ADAPTER_PROJECT_ROOT/.venv/bin/python3" -c "
+import yaml
+try:
+    with open('${settings}') as f:
+        cfg = yaml.safe_load(f) or {}
+    agents = cfg.get('cli', {}).get('agents', {})
+    results = [k for k in agents if k.startswith('ashigaru')]
+    results.sort(key=lambda x: int(x.replace('ashigaru', '')) if x.replace('ashigaru', '').isdigit() else 99)
+    print(' '.join(results))
+except Exception:
+    pass
+" 2>/dev/null)
+    if [[ -n "$result" ]]; then
+        echo "$result"
+    else
+        echo "ashigaru1 ashigaru2 ashigaru3 ashigaru4 ashigaru5 ashigaru6 ashigaru7"
+    fi
+}
