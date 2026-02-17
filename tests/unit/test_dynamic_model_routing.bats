@@ -97,6 +97,74 @@ capability_tiers:
     cost_group: claude_max
 YAML
 
+    # Subscription pattern テスト用: Claude onlyパターン
+    cat > "${TEST_TMP}/settings_claude_only.yaml" << 'YAML'
+cli:
+  default: claude
+capability_tiers:
+  claude-sonnet-4-5-20250929:
+    max_bloom: 5
+    cost_group: claude_max
+  claude-opus-4-6:
+    max_bloom: 6
+    cost_group: claude_max
+YAML
+
+    # Subscription pattern テスト用: ChatGPT onlyパターン
+    cat > "${TEST_TMP}/settings_chatgpt_only.yaml" << 'YAML'
+cli:
+  default: codex
+capability_tiers:
+  gpt-5.3-codex-spark:
+    max_bloom: 3
+    cost_group: chatgpt_pro
+  gpt-5.3:
+    max_bloom: 4
+    cost_group: chatgpt_pro
+YAML
+
+    # Subscription pattern テスト用: available_cost_groups明示定義
+    cat > "${TEST_TMP}/settings_explicit_groups.yaml" << 'YAML'
+cli:
+  default: claude
+available_cost_groups:
+  - claude_max
+capability_tiers:
+  gpt-5.3-codex-spark:
+    max_bloom: 3
+    cost_group: chatgpt_pro
+  gpt-5.3:
+    max_bloom: 4
+    cost_group: chatgpt_pro
+  claude-sonnet-4-5-20250929:
+    max_bloom: 5
+    cost_group: claude_max
+  claude-opus-4-6:
+    max_bloom: 6
+    cost_group: claude_max
+YAML
+
+    # Subscription pattern テスト用: available_cost_groups chatgpt_proのみ
+    cat > "${TEST_TMP}/settings_chatgpt_groups.yaml" << 'YAML'
+cli:
+  default: codex
+available_cost_groups:
+  - chatgpt_pro
+capability_tiers:
+  gpt-5.3-codex-spark:
+    max_bloom: 3
+    cost_group: chatgpt_pro
+  gpt-5.3:
+    max_bloom: 4
+    cost_group: chatgpt_pro
+  claude-sonnet-4-5-20250929:
+    max_bloom: 5
+    cost_group: claude_max
+  claude-opus-4-6:
+    max_bloom: 6
+    cost_group: claude_max
+YAML
+
     # Phase 3 テスト用: gunshi_analysis.yaml フィクスチャ
 
     # 正常な分析YAML（全フィールド定義）
@@ -671,4 +739,112 @@ print(len(doc.get('history', [])))
     append_model_performance "$perf_file" "subtask_004" "bugfix" 4 "gpt-5.3" "fail" 0.30
     result=$(get_model_performance_summary "$perf_file" "bugfix" 4)
     [[ "$result" == *"pass_rate:0.75"* ]]
+}
+
+# =============================================================================
+# Subscription Patterns: TC-DMR-400〜423
+# ユーザー契約パターン対応（Claude only / ChatGPT only / 両方）
+# =============================================================================
+
+# --- TC-DMR-400〜402: get_available_cost_groups ---
+
+@test "TC-DMR-400: get_available_cost_groups — 明示定義 claude_maxのみ" {
+    load_adapter_with "${TEST_TMP}/settings_explicit_groups.yaml"
+    result=$(get_available_cost_groups)
+    [ "$result" = "claude_max" ]
+}
+
+@test "TC-DMR-401: get_available_cost_groups — 省略時はcapability_tiersから自動推定" {
+    load_adapter_with "${TEST_TMP}/settings_with_tiers.yaml"
+    result=$(get_available_cost_groups)
+    # 両方のcost_groupが含まれる（順序不問）
+    [[ "$result" == *"chatgpt_pro"* ]]
+    [[ "$result" == *"claude_max"* ]]
+}
+
+@test "TC-DMR-402: get_available_cost_groups — capability_tiers不在 → 空" {
+    load_adapter_with "${TEST_TMP}/settings_no_tiers.yaml"
+    result=$(get_available_cost_groups)
+    [ "$result" = "" ]
+}
+
+@test "TC-DMR-403: get_available_cost_groups — Claude onlyの自動推定" {
+    load_adapter_with "${TEST_TMP}/settings_claude_only.yaml"
+    result=$(get_available_cost_groups)
+    [ "$result" = "claude_max" ]
+}
+
+@test "TC-DMR-404: get_available_cost_groups — ChatGPT onlyの自動推定" {
+    load_adapter_with "${TEST_TMP}/settings_chatgpt_only.yaml"
+    result=$(get_available_cost_groups)
+    [ "$result" = "chatgpt_pro" ]
+}
+
+# --- TC-DMR-410〜413: get_recommended_model — 契約パターン別動作 ---
+
+@test "TC-DMR-410: Claude only — L3 → sonnet + overqualified警告" {
+    load_adapter_with "${TEST_TMP}/settings_claude_only.yaml"
+    result=$(get_recommended_model 3 2>/tmp/dmr_410_stderr)
+    [ "$result" = "claude-sonnet-4-5-20250929" ]
+    # stderrにoverqualified警告
+    grep -q "overqualified" /tmp/dmr_410_stderr
+    rm -f /tmp/dmr_410_stderr
+}
+
+@test "TC-DMR-411: ChatGPT only — L5 → gpt-5.3 + insufficient警告" {
+    load_adapter_with "${TEST_TMP}/settings_chatgpt_only.yaml"
+    result=$(get_recommended_model 5 2>/tmp/dmr_411_stderr)
+    [ "$result" = "gpt-5.3" ]
+    # stderrにinsufficient警告
+    grep -q "insufficient" /tmp/dmr_411_stderr
+    rm -f /tmp/dmr_411_stderr
+}
+
+@test "TC-DMR-412: available_cost_groups=claude_max → chatgpt_proモデルを候補除外" {
+    load_adapter_with "${TEST_TMP}/settings_explicit_groups.yaml"
+    # L3でもchatgpt_proモデル(Spark)は除外、claude_maxのsonnetが選ばれる
+    result=$(get_recommended_model 3)
+    [[ "$result" == "claude-sonnet-4-5-20250929" ]]
+}
+
+@test "TC-DMR-413: available_cost_groups=chatgpt_pro → claude_maxモデルを候補除外" {
+    load_adapter_with "${TEST_TMP}/settings_chatgpt_groups.yaml"
+    # L5でもclaude_maxモデル(Sonnet)は除外、chatgpt_proの最大gpt-5.3が選ばれる
+    result=$(get_recommended_model 5 2>/dev/null)
+    [ "$result" = "gpt-5.3" ]
+}
+
+@test "TC-DMR-414: 両方契約 — L3 → Spark（従来通り最安選択）" {
+    load_adapter_with "${TEST_TMP}/settings_with_tiers.yaml"
+    result=$(get_recommended_model 3)
+    [ "$result" = "gpt-5.3-codex-spark" ]
+}
+
+# --- TC-DMR-420〜423: validate_subscription_coverage ---
+
+@test "TC-DMR-420: validate_subscription_coverage — 全Bloomカバー → ok" {
+    load_adapter_with "${TEST_TMP}/settings_with_tiers.yaml"
+    result=$(validate_subscription_coverage)
+    [ "$result" = "ok" ]
+}
+
+@test "TC-DMR-421: validate_subscription_coverage — ChatGPT only → gap:5,6" {
+    load_adapter_with "${TEST_TMP}/settings_chatgpt_only.yaml"
+    result=$(validate_subscription_coverage)
+    [[ "$result" == *"gap"* ]]
+    [[ "$result" == *"5"* ]]
+    [[ "$result" == *"6"* ]]
+}
+
+@test "TC-DMR-422: validate_subscription_coverage — Claude only → カバー(L5+L6あり)" {
+    load_adapter_with "${TEST_TMP}/settings_claude_only.yaml"
+    result=$(validate_subscription_coverage)
+    # Sonnet(L5)+Opus(L6)でL1-L6全てカバー可能（overqualifiedだが対応可能）
+    [ "$result" = "ok" ]
+}
+
+@test "TC-DMR-423: validate_subscription_coverage — capability_tiers不在 → 未設定" {
+    load_adapter_with "${TEST_TMP}/settings_no_tiers.yaml"
+    result=$(validate_subscription_coverage)
+    [ "$result" = "unconfigured" ]
 }

@@ -378,8 +378,51 @@ except Exception:
     fi
 }
 
+# get_available_cost_groups()
+# ユーザーの契約パターンを返す
+# 1) settings.yamlにavailable_cost_groups定義あり → そのまま返す
+# 2) 未定義 → capability_tiersから自動推定（定義済みモデルのcost_groupを集約）
+# 3) capability_tiers不在 → 空文字列
+# 出力: スペース区切りのcost_group一覧（例: "claude_max chatgpt_pro"）
+get_available_cost_groups() {
+    local settings="${CLI_ADAPTER_SETTINGS:-${CLI_ADAPTER_PROJECT_ROOT}/config/settings.yaml}"
+
+    local result
+    result=$("$CLI_ADAPTER_PROJECT_ROOT/.venv/bin/python3" -c "
+import yaml, sys
+try:
+    with open('${settings}') as f:
+        cfg = yaml.safe_load(f) or {}
+
+    # 1) 明示定義があればそれを使う
+    explicit = cfg.get('available_cost_groups')
+    if explicit and isinstance(explicit, list):
+        print(' '.join(str(g) for g in explicit))
+        sys.exit(0)
+
+    # 2) capability_tiersから自動推定
+    tiers = cfg.get('capability_tiers')
+    if not tiers or not isinstance(tiers, dict):
+        print('')
+        sys.exit(0)
+
+    groups = set()
+    for model, spec in tiers.items():
+        if isinstance(spec, dict):
+            cg = spec.get('cost_group')
+            if cg:
+                groups.add(cg)
+    print(' '.join(sorted(groups)))
+except Exception:
+    print('')
+" 2>/dev/null)
+
+    echo "$result"
+}
+
 # get_recommended_model(bloom_level)
 # 指定Bloomレベルに対応する最もコスト効率の良いモデルを返す
+# available_cost_groupsで絞り込み。能力不足/過剰時はstderr警告。
 # capability_tiersセクション不在 → 空文字列
 # bloom_level範囲外(1-6以外) → 空文字列 + exit code 1
 get_recommended_model() {
@@ -391,40 +434,60 @@ get_recommended_model() {
         return 1
     fi
 
+    local settings="${CLI_ADAPTER_SETTINGS:-${CLI_ADAPTER_PROJECT_ROOT}/config/settings.yaml}"
+
+    # Python: stdout=モデル名, stderr=警告（呼び出し側のstderrにパススルー）
     local result
     result=$("$CLI_ADAPTER_PROJECT_ROOT/.venv/bin/python3" -c "
 import yaml, sys
+
 try:
-    with open('${CLI_ADAPTER_SETTINGS}') as f:
+    with open('${settings}') as f:
         cfg = yaml.safe_load(f) or {}
     tiers = cfg.get('capability_tiers')
     if not tiers or not isinstance(tiers, dict):
-        print('')
         sys.exit(0)
 
     bloom = int('${bloom_level}')
     cost_priority = {'chatgpt_pro': 0, 'claude_max': 1}
 
+    # available_cost_groups: 明示定義 or None(全許可)
+    explicit_groups = cfg.get('available_cost_groups')
+    if explicit_groups and isinstance(explicit_groups, list):
+        allowed_groups = set(str(g) for g in explicit_groups)
+    else:
+        allowed_groups = None
+
     candidates = []
+    all_models = []
     for model, spec in tiers.items():
         if not isinstance(spec, dict):
             continue
         mb = spec.get('max_bloom', 6)
+        cg = spec.get('cost_group', 'unknown')
+        if allowed_groups is not None and cg not in allowed_groups:
+            continue
+        all_models.append((mb, cg, model))
         if isinstance(mb, int) and mb >= bloom:
-            cg = spec.get('cost_group', 'unknown')
             candidates.append((cost_priority.get(cg, 99), mb, model))
 
+    if not all_models:
+        sys.exit(0)
+
     if not candidates:
-        # No model can handle this bloom level — pick the highest
-        best = max(tiers.items(), key=lambda x: x[1].get('max_bloom', 0) if isinstance(x[1], dict) else 0)
-        print(best[0])
+        best = max(all_models, key=lambda x: x[0])
+        print(best[2])
+        print(f'[WARN] insufficient: {best[2]} (max_bloom={best[0]}) cannot handle bloom level {bloom}', file=sys.stderr)
     else:
-        # Sort by: 1) lowest max_bloom (just enough), 2) cost priority (chatgpt_pro first)
         candidates.sort(key=lambda x: (x[1], x[0]))
-        print(candidates[0][2])
+        chosen_mb = candidates[0][1]
+        chosen_model = candidates[0][2]
+        print(chosen_model)
+        if chosen_mb - bloom >= 2:
+            print(f'[WARN] overqualified: {chosen_model} (max_bloom={chosen_mb}) for bloom level {bloom}. Consider adding a lower-tier model.', file=sys.stderr)
 except Exception:
-    print('')
-" 2>/dev/null)
+    pass
+")
 
     echo "$result"
 }
@@ -764,4 +827,72 @@ try:
 except Exception as e:
     print('total:0 pass:0 fail:0 pass_rate:0.00')
 " 2>/dev/null
+}
+
+# =============================================================================
+# Subscription Pattern Validation
+# ユーザー契約パターンの検証
+# =============================================================================
+
+# validate_subscription_coverage()
+# 全Bloomレベル(1-6)が利用可能なモデルでカバーされているか検証
+# 出力:
+#   "ok" — 全レベルカバー済み
+#   "unconfigured" — capability_tiers未定義
+#   "gap:N,M max_available:X" — レベルN,Mがカバーされていない。最大対応レベルはX
+validate_subscription_coverage() {
+    local settings="${CLI_ADAPTER_SETTINGS:-${CLI_ADAPTER_PROJECT_ROOT}/config/settings.yaml}"
+
+    local result
+    result=$("$CLI_ADAPTER_PROJECT_ROOT/.venv/bin/python3" -c "
+import yaml, sys
+
+try:
+    with open('${settings}') as f:
+        cfg = yaml.safe_load(f) or {}
+    tiers = cfg.get('capability_tiers')
+    if not tiers or not isinstance(tiers, dict):
+        print('unconfigured')
+        sys.exit(0)
+
+    # available_cost_groups フィルタ
+    explicit_groups = cfg.get('available_cost_groups')
+    if explicit_groups and isinstance(explicit_groups, list):
+        allowed_groups = set(str(g) for g in explicit_groups)
+    else:
+        allowed_groups = None
+
+    # 利用可能なモデルのmax_bloomを収集
+    max_blooms = []
+    for model, spec in tiers.items():
+        if not isinstance(spec, dict):
+            continue
+        cg = spec.get('cost_group', 'unknown')
+        if allowed_groups is not None and cg not in allowed_groups:
+            continue
+        mb = spec.get('max_bloom', 6)
+        if isinstance(mb, int):
+            max_blooms.append(mb)
+
+    if not max_blooms:
+        print('unconfigured')
+        sys.exit(0)
+
+    max_available = max(max_blooms)
+
+    # 各Bloomレベル(1-6)にmax_bloom >= levelのモデルがあるか
+    gaps = []
+    for level in range(1, 7):
+        if not any(mb >= level for mb in max_blooms):
+            gaps.append(str(level))
+
+    if gaps:
+        print(f'gap:{','.join(gaps)} max_available:{max_available}')
+    else:
+        print('ok')
+except Exception:
+    print('unconfigured')
+" 2>/dev/null)
+
+    echo "$result"
 }
