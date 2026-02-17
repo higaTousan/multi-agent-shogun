@@ -143,6 +143,9 @@
 # Tests
 !tests/
 !tests/*.bats
+!tests/*.sh
+!tests/fixtures/
+!tests/fixtures/*.yaml
 !tests/unit/
 !tests/unit/*.bats
 !tests/integration/

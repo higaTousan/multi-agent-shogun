@@ -220,6 +220,71 @@ analysis:
   confidence: 2.0
 YAML
 
+    # find_agent_for_model テスト用: 混合CLI設定
+    cat > "${TEST_TMP}/settings_mixed_cli.yaml" << 'YAML'
+cli:
+  default: claude
+  agents:
+    karo:
+      type: claude
+      model: claude-sonnet-4-5-20250929
+    ashigaru1:
+      type: codex
+      model: gpt-5.3-codex-spark
+    ashigaru2:
+      type: codex
+      model: gpt-5.3-codex-spark
+    ashigaru3:
+      type: codex
+      model: gpt-5.3-codex-spark
+    ashigaru4:
+      type: claude
+      model: claude-sonnet-4-6
+    ashigaru5:
+      type: claude
+      model: claude-sonnet-4-6
+    ashigaru6:
+      type: claude
+      model: claude-opus-4-6
+    ashigaru7:
+      type: claude
+      model: claude-opus-4-6
+    gunshi:
+      type: claude
+      model: opus
+capability_tiers:
+  gpt-5.3-codex-spark:
+    max_bloom: 3
+    cost_group: chatgpt_pro
+  claude-sonnet-4-6:
+    max_bloom: 5
+    cost_group: claude_max
+  claude-opus-4-6:
+    max_bloom: 6
+    cost_group: claude_max
+bloom_routing: "manual"
+YAML
+
+    # find_agent_for_model テスト用: 全足軽Spark
+    cat > "${TEST_TMP}/settings_all_spark.yaml" << 'YAML'
+cli:
+  default: codex
+  agents:
+    ashigaru1:
+      type: codex
+      model: gpt-5.3-codex-spark
+    ashigaru2:
+      type: codex
+      model: gpt-5.3-codex-spark
+    ashigaru3:
+      type: codex
+      model: gpt-5.3-codex-spark
+capability_tiers:
+  gpt-5.3-codex-spark:
+    max_bloom: 3
+    cost_group: chatgpt_pro
+YAML
+
     # .venvへのsymlinkを作成
     if [ -d "${PROJECT_ROOT}/.venv" ]; then
         ln -sf "${PROJECT_ROOT}/.venv" "${TEST_TMP}/.venv"
@@ -847,4 +912,71 @@ print(len(doc.get('history', [])))
     load_adapter_with "${TEST_TMP}/settings_no_tiers.yaml"
     result=$(validate_subscription_coverage)
     [ "$result" = "unconfigured" ]
+}
+
+# ============================================================
+# TC-FAM-001〜009: find_agent_for_model() — Phase 2 ユニットテスト
+# ============================================================
+# NOTE: ユニットテスト環境ではtmuxセッションが存在しない。
+#       pane_target が空 → 最初の候補を即返す動作になる（設計どおり）。
+#       tmux統合はE2Eテストで検証する。
+
+@test "TC-FAM-001: 完全一致の足軽が存在 → ashigaru1 を返す（Spark）" {
+    load_adapter_with "${TEST_TMP}/settings_mixed_cli.yaml"
+    result=$(find_agent_for_model "gpt-5.3-codex-spark")
+    [ "$result" = "ashigaru1" ]
+}
+
+@test "TC-FAM-002: Sonnet足軽が存在 → ashigaru4 を返す" {
+    load_adapter_with "${TEST_TMP}/settings_mixed_cli.yaml"
+    result=$(find_agent_for_model "claude-sonnet-4-6")
+    [ "$result" = "ashigaru4" ]
+}
+
+@test "TC-FAM-003: Opus足軽が存在 → ashigaru6 を返す" {
+    load_adapter_with "${TEST_TMP}/settings_mixed_cli.yaml"
+    result=$(find_agent_for_model "claude-opus-4-6")
+    [ "$result" = "ashigaru6" ]
+}
+
+@test "TC-FAM-004: 対応モデルの足軽がない + 他の足軽が存在 → フォールバック（いずれかの足軽）" {
+    load_adapter_with "${TEST_TMP}/settings_mixed_cli.yaml"
+    result=$(find_agent_for_model "gpt-5.1-codex-max")
+    # 完全一致なし → フォールバックとして番号最小の足軽を返す
+    [ -n "$result" ]
+    [[ "$result" =~ ^ashigaru[0-9]+$ ]]
+}
+
+@test "TC-FAM-005: 引数なし → exit code 1" {
+    load_adapter_with "${TEST_TMP}/settings_mixed_cli.yaml"
+    run find_agent_for_model
+    [ "$status" -eq 1 ]
+}
+
+@test "TC-FAM-006: 空文字引数 → exit code 1" {
+    load_adapter_with "${TEST_TMP}/settings_mixed_cli.yaml"
+    run find_agent_for_model ""
+    [ "$status" -eq 1 ]
+}
+
+@test "TC-FAM-007: 複数の同モデル足軽 → 番号最小を返す（ashigaru1）" {
+    load_adapter_with "${TEST_TMP}/settings_all_spark.yaml"
+    result=$(find_agent_for_model "gpt-5.3-codex-spark")
+    [ "$result" = "ashigaru1" ]
+}
+
+@test "TC-FAM-008: capability_tiersなし設定でも動作する（後方互換）" {
+    load_adapter_with "${TEST_TMP}/settings_no_tiers.yaml"
+    # no_tiersでもagents定義がある場合はSpark足軽を探して返す
+    result=$(find_agent_for_model "gpt-5.3-codex-spark")
+    [ "$result" = "ashigaru1" ]
+}
+
+@test "TC-FAM-009: 足軽のみ対象（karo, gunshiは除外される）" {
+    load_adapter_with "${TEST_TMP}/settings_mixed_cli.yaml"
+    # karo, gunshiのモデルを指定 → ashiguruの中に一致なし → フォールバックor先頭
+    result=$(find_agent_for_model "claude-sonnet-4-5-20250929")
+    # karo (claude-sonnet-4-5-20250929) は候補に入らない
+    # 他のashiguruにもこのモデルがないのでフォールバック
+    [[ "$result" =~ ^ashigaru[0-9]+$ ]]
 }

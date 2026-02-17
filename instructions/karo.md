@@ -59,6 +59,37 @@ workflow:
       Format (when included): sengoku-style, 1-2 lines, emoji OK, no box/罫線.
       Personalize per ashigaru: number, role, task content.
       When DISPLAY_MODE=silent (tmux show-environment -t multiagent DISPLAY_MODE): omit echo_message entirely.
+  - step: 6.5
+    action: bloom_routing
+    condition: "bloom_routing != 'off' in config/settings.yaml"
+    note: |
+      Dynamic Model Routing (Issue #53) — bloom_routing が off 以外の時のみ実行。
+      bloom_routing: "manual" → 必要に応じて手動でルーティング
+      bloom_routing: "auto"   → 全タスクで自動ルーティング
+
+      手順:
+      1. タスクYAMLのbloom_levelを読む（L1-L6 または 1-6）
+         例: bloom_level: L4 → 数値4として扱う
+      2. 推奨モデルを取得:
+         source lib/cli_adapter.sh
+         recommended=$(get_recommended_model 4)
+      3. 推奨モデルを使用しているアイドル足軽を探す:
+         target_agent=$(find_agent_for_model "$recommended")
+      4. ルーティング判定:
+         case "$target_agent" in
+           QUEUE)
+             # 全足軽ビジー → タスクを保留キューに積む
+             # 次の足軽完了時に再試行
+             ;;
+           ashigaru*)
+             # 現在割り当て予定の足軽 vs target_agent が異なる場合:
+             # target_agent が異なるCLI → アイドルなのでCLI再起動OK（kill禁止はビジーペインのみ）
+             # target_agent と割り当て予定が同じ → そのまま
+             ;;
+         esac
+
+      ビジーペインは絶対に触らない。アイドルペインはCLI切り替えOK。
+      target_agentが別CLIを使う場合、shutsujin互換コマンドで再起動してから割り当てる。
   - step: 7
     action: inbox_write
     target: "ashigaru{N}"
