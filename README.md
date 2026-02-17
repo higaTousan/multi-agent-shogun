@@ -64,14 +64,15 @@ Run 10 AI coding agents in parallel — **Claude Code, OpenAI Codex, GitHub Copi
 
 Most multi-agent frameworks burn API tokens on coordination. Shogun doesn't.
 
-| | Claude Code `Task` tool | LangGraph | CrewAI | **multi-agent-shogun** |
-|---|---|---|---|---|
-| **Architecture** | Subagents inside one process | Graph-based state machine | Role-based agents | Feudal hierarchy via tmux |
-| **Parallelism** | Sequential (one at a time) | Parallel nodes (v0.2+) | Limited | **8 independent agents** |
-| **Coordination cost** | API calls per Task | API + infra (Postgres/Redis) | API + CrewAI platform | **Zero** (YAML + tmux) |
-| **Observability** | Claude logs only | LangSmith integration | OpenTelemetry | **Live tmux panes** + dashboard |
-| **Skill discovery** | None | None | None | **Bottom-up auto-proposal** |
-| **Setup** | Built into Claude Code | Heavy (infra required) | pip install | Shell scripts |
+| | Claude Code `Task` tool | Claude Code Agent Teams | LangGraph | CrewAI | **multi-agent-shogun** |
+|---|---|---|---|---|---|
+| **Architecture** | Subagents inside one process | Team lead + teammates (JSON mailbox) | Graph-based state machine | Role-based agents | Feudal hierarchy via tmux |
+| **Parallelism** | Sequential (one at a time) | Multiple independent sessions | Parallel nodes (v0.2+) | Limited | **8 independent agents** |
+| **Coordination cost** | API calls per Task | Token-heavy (each teammate = separate context) | API + infra (Postgres/Redis) | API + CrewAI platform | **Zero** (YAML + tmux) |
+| **Multi-CLI** | Claude Code only | Claude Code only | Any LLM API | Any LLM API | **4 CLIs** (Claude/Codex/Copilot/Kimi) |
+| **Observability** | Claude logs only | tmux split-panes or in-process | LangSmith integration | OpenTelemetry | **Live tmux panes** + dashboard |
+| **Skill discovery** | None | None | None | None | **Bottom-up auto-proposal** |
+| **Setup** | Built into Claude Code | Built-in (experimental) | Heavy (infra required) | pip install | Shell scripts |
 
 ### What makes this different
 
@@ -979,6 +980,37 @@ task:
 
 When a blocking task completes, the Karo automatically unblocks dependent tasks and assigns them to available Ashigaru. This prevents idle waiting and enables efficient pipelining of dependent work.
 
+### Dynamic Model Routing (capability_tiers)
+
+Beyond agent-level routing, you can configure **model-level routing within the Ashigaru tier**. Define a `capability_tiers` table in `config/settings.yaml` mapping each model to its maximum Bloom level:
+
+```yaml
+capability_tiers:
+  gpt-5.3-codex-spark:
+    max_bloom: 3       # L1–L3 only: fast, high-volume tasks
+    cost_group: chatgpt_pro
+  gpt-5.3-codex:
+    max_bloom: 4       # L1–L4: + analysis and debugging
+    cost_group: chatgpt_pro
+  claude-sonnet-4-6:
+    max_bloom: 5       # L1–L5: + design evaluation
+    cost_group: claude_max
+  claude-opus-4-6:
+    max_bloom: 6       # L1–L6: + novel architecture, strategy
+    cost_group: claude_max
+```
+
+The `cost_group` field links each model to your subscription plan, enabling the system to avoid routing tasks to models your plan doesn't cover.
+
+Two built-in skills help you configure this:
+
+| Skill | Purpose |
+|-------|---------|
+| `/shogun-model-list` | Reference table: all models × subscriptions × Bloom max |
+| `/shogun-bloom-config` | Interactive: answer 2 questions → get ready-to-paste YAML |
+
+Run `/shogun-bloom-config` after setup to generate your optimal `capability_tiers` configuration.
+
 ---
 
 ## Philosophy
@@ -1050,9 +1082,20 @@ No skills are included out of the box. Skills emerge organically during operatio
 
 Invoke skills with `/skill-name`. Just tell the Shogun: "run /skill-name".
 
+### Included Skills (committed to repo)
+
+Two skills ship with the repository in `skills/`. They are domain-agnostic setup utilities useful for any user:
+
+| Skill | Description |
+|-------|-------------|
+| `/shogun-model-list` | Reference table: all CLI tools × models × subscriptions × Bloom max level |
+| `/shogun-bloom-config` | Interactive configurator: answer 2 questions about your subscriptions → get ready-to-paste `capability_tiers` YAML |
+
+These are intentionally minimal — they help you configure the system, not do your work for you.
+
 ### Skill Philosophy
 
-**1. Skills are not committed to the repo**
+**1. Personal skills are not committed to the repo**
 
 Skills in `.claude/commands/` are excluded from version control by design:
 - Every user's workflow is different

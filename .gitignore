@@ -125,12 +125,16 @@
 !images/screenshots/hero/latest-translucent-20260210-190453.png
 !images/screenshots/hero/latest-translucent-20260208-084602.png
 
-# Skills (skill-creator only)
+# Skills (public OSS skills committed to repo)
 !skills/
 !skills/skill-creator/
 !skills/skill-creator/SKILL.md
 !skills/shogun-agent-status/
 !skills/shogun-agent-status/SKILL.md
+!skills/shogun-model-list/
+!skills/shogun-model-list/SKILL.md
+!skills/shogun-bloom-config/
+!skills/shogun-bloom-config/SKILL.md
 
 # Test specs
 !tests/specs/
