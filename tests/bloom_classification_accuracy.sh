@@ -39,7 +39,7 @@ fi
 
 # Python で corpus を読み込んで各タスクを処理
 python3 << PYEOF
-import yaml, subprocess, re, sys, json
+import yaml, subprocess, re, sys, json, os
 from pathlib import Path
 from datetime import datetime
 
