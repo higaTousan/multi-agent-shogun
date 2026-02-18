@@ -43,6 +43,10 @@
 #   T-BUSY-005: agent_is_busy — returns busy during /clear cooldown (LAST_CLEAR_TS)
 #   T-BUSY-006: agent_is_busy — returns idle after /clear cooldown expires
 #   T-BUSY-007: agent_is_busy — /clear cooldown overrides idle pane
+#   T-BUSY-008: agent_is_busy — idle prompt at bottom overrides old busy markers (false-busy fix)
+#   T-BUSY-009: agent_is_busy — 'background terminal running' detected as busy
+#   T-BUSY-010: agent_is_busy — 'Compacting conversation' detected as busy
+#   T-BUSY-011: agent_is_busy — 'esc to interrupt' alone detected as busy
 #   T-CRESET-001: send_context_reset — suppresses /clear for karo
 #   T-CRESET-002: send_context_reset — suppresses /clear for gunshi
 #   T-CRESET-003: send_context_reset — sends /clear for ashigaru
@@ -905,6 +909,62 @@ YAML
     '
     [ "$status" -eq 0 ]
     echo "$output" | grep -q "BUSY_DURING_COOLDOWN"
+}
+
+# --- T-BUSY-008: idle prompt at bottom overrides old busy markers (false-busy fix) ---
+# Bug: 59ec12f / 69c1ecb — old "Working" or "esc to interrupt" lingered in scroll-back
+# above the idle prompt, causing false-busy. Fix: only check bottom 5 lines, idle first.
+
+@test "T-BUSY-008: agent_is_busy returns idle when idle prompt is below old busy markers" {
+    run bash -c '
+        MOCK_CAPTURE_PANE="$(printf "◦ Working on task (12s • esc to interrupt)\nsome output line\nmore output\n\n❯ ")"
+        source "'"$TEST_HARNESS"'"
+        LAST_CLEAR_TS=0
+        if agent_is_busy; then
+            echo "WRONGLY_BUSY"
+        else
+            echo "CORRECTLY_IDLE"
+        fi
+    '
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "CORRECTLY_IDLE"
+}
+
+# --- T-BUSY-009: 'background terminal running' detected as busy ---
+# Bug: 91ebf61 — Codex shows this when a tool is running in background.
+
+@test "T-BUSY-009: agent_is_busy detects 'background terminal running' as busy" {
+    run bash -c '
+        MOCK_CAPTURE_PANE="$(printf "Some output\nbackground terminal running\n")"
+        source "'"$TEST_HARNESS"'"
+        LAST_CLEAR_TS=0
+        agent_is_busy
+    '
+    [ "$status" -eq 0 ]
+}
+
+# --- T-BUSY-010: 'Compacting conversation' detected as busy ---
+
+@test "T-BUSY-010: agent_is_busy detects 'Compacting conversation' as busy" {
+    run bash -c '
+        MOCK_CAPTURE_PANE="$(printf "Compacting conversation...\n")"
+        source "'"$TEST_HARNESS"'"
+        LAST_CLEAR_TS=0
+        agent_is_busy
+    '
+    [ "$status" -eq 0 ]
+}
+
+# --- T-BUSY-011: 'esc to interrupt' detected as busy ---
+
+@test "T-BUSY-011: agent_is_busy detects 'esc to interrupt' as busy" {
+    run bash -c '
+        MOCK_CAPTURE_PANE="$(printf "◦ Thinking (5s • esc to interrupt)\n")"
+        source "'"$TEST_HARNESS"'"
+        LAST_CLEAR_TS=0
+        agent_is_busy
+    '
+    [ "$status" -eq 0 ]
 }
 
 # --- T-CRESET-001: send_context_reset suppresses /clear for karo ---
