@@ -40,6 +40,12 @@
 #   T-SHOGUN-002: session_has_client — returns 1 when no client
 #   T-SHOGUN-003: send_wakeup — shogun + active + attached → display-message only
 #   T-SHOGUN-004: send_wakeup — shogun + active + detached → send-keys fallthrough
+#   T-BUSY-005: agent_is_busy — returns busy during /clear cooldown (LAST_CLEAR_TS)
+#   T-BUSY-006: agent_is_busy — returns idle after /clear cooldown expires
+#   T-BUSY-007: agent_is_busy — /clear cooldown overrides idle pane
+#   T-CRESET-001: send_context_reset — suppresses /clear for karo
+#   T-CRESET-002: send_context_reset — suppresses /clear for gunshi
+#   T-CRESET-003: send_context_reset — sends /clear for ashigaru
 #   T-COPILOT-001: send_cli_command — copilot /clear → Ctrl-C + restart
 #   T-COPILOT-002: send_cli_command — copilot /model → skip
 
@@ -851,4 +857,101 @@ YAML
 
     # Should have used send-keys
     grep -q "send-keys.*inbox2" "$MOCK_LOG"
+}
+
+# --- T-BUSY-005: agent_is_busy during /clear cooldown ---
+
+@test "T-BUSY-005: agent_is_busy returns 0 (busy) during /clear cooldown period" {
+    run bash -c '
+        MOCK_CAPTURE_PANE="› prompt
+  ? for shortcuts                100% context left"
+        source "'"$TEST_HARNESS"'"
+        now=$(date +%s)
+        LAST_CLEAR_TS=$((now - 10))  # /clear sent 10 seconds ago (within 30s cooldown)
+        agent_is_busy
+    '
+    [ "$status" -eq 0 ]
+}
+
+# --- T-BUSY-006: agent_is_busy idle after /clear cooldown expires ---
+
+@test "T-BUSY-006: agent_is_busy returns 1 (idle) after /clear cooldown expires" {
+    run bash -c '
+        MOCK_CAPTURE_PANE="› prompt
+  ? for shortcuts                100% context left"
+        source "'"$TEST_HARNESS"'"
+        now=$(date +%s)
+        LAST_CLEAR_TS=$((now - 40))  # /clear sent 40 seconds ago (past 30s cooldown)
+        agent_is_busy
+    '
+    [ "$status" -eq 1 ]
+}
+
+# --- T-BUSY-007: /clear cooldown overrides idle pane ---
+
+@test "T-BUSY-007: agent_is_busy /clear cooldown overrides idle pane state" {
+    run bash -c '
+        MOCK_CAPTURE_PANE="› Summarize recent commits
+  ? for shortcuts                100% context left"
+        source "'"$TEST_HARNESS"'"
+        now=$(date +%s)
+        LAST_CLEAR_TS=$((now - 5))  # /clear sent 5 seconds ago
+        # Pane looks idle, but cooldown should make it busy
+        if agent_is_busy; then
+            echo "BUSY_DURING_COOLDOWN"
+        else
+            echo "WRONGLY_IDLE"
+        fi
+    '
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "BUSY_DURING_COOLDOWN"
+}
+
+# --- T-CRESET-001: send_context_reset suppresses /clear for karo ---
+
+@test "T-CRESET-001: send_context_reset suppresses /clear for karo" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        AGENT_ID="karo"
+        send_context_reset
+    '
+    [ "$status" -eq 0 ]
+
+    # No send-keys should have occurred
+    ! grep -q "send-keys" "$MOCK_LOG"
+
+    # SKIP message in stderr
+    echo "$output" | grep -q "SKIP.*karo"
+}
+
+# --- T-CRESET-002: send_context_reset suppresses /clear for gunshi ---
+
+@test "T-CRESET-002: send_context_reset suppresses /clear for gunshi" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        AGENT_ID="gunshi"
+        send_context_reset
+    '
+    [ "$status" -eq 0 ]
+
+    # No send-keys should have occurred
+    ! grep -q "send-keys" "$MOCK_LOG"
+
+    # SKIP message in stderr
+    echo "$output" | grep -q "SKIP.*gunshi"
+}
+
+# --- T-CRESET-003: send_context_reset sends /clear for ashigaru ---
+
+@test "T-CRESET-003: send_context_reset sends /clear for ashigaru" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        AGENT_ID="ashigaru3"
+        CLI_TYPE="claude"
+        send_context_reset
+    '
+    [ "$status" -eq 0 ]
+
+    # /clear should have been sent via send-keys
+    grep -q "send-keys.*/clear" "$MOCK_LOG"
 }
