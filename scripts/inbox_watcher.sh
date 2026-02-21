@@ -364,7 +364,7 @@ try:
 
     messages = data.get("messages", []) or []
     unread = [m for m in messages if not m.get("read", False)]
-    special_types = ("clear_command", "model_switch")
+    special_types = ("clear_command", "model_switch", "connection_switch")
     specials = [m for m in unread if m.get("type") in special_types]
 
     if specials:
@@ -483,6 +483,54 @@ send_cli_command() {
         sleep 3
     else
         sleep 1
+    fi
+}
+
+# ─── connection_switch: /clear → 新CLI起動コマンド送信 ───
+# cost_groupをまたぐBloomモデル切替を実行する
+# /modelコマンドでは環境変数（ANTHROPIC_BASE_URL等）が変わらないため、
+# /clear + 新しいbuild_cli_command_with_model の結果を送信する
+send_connection_switch() {
+    local target_model="$1"
+
+    # 将軍パネルへの注入は禁止
+    if [ "$AGENT_ID" = "shogun" ]; then
+        echo "[$(date)] [SKIP] shogun: suppressing connection_switch ($target_model)" >&2
+        return 0
+    fi
+
+    if [ -z "$target_model" ]; then
+        echo "[$(date)] [SKIP] connection_switch: empty target_model for $AGENT_ID" >&2
+        return 0
+    fi
+
+    echo "[$(date)] [CONNECTION-SWITCH] $AGENT_ID: switching to model $target_model" >&2
+
+    # Step 1: 現在のClaude Codeセッションを終了 (/clear)
+    send_cli_command "/clear"
+    # send_cli_command内でsleep 3済み
+
+    # Step 2: 新しい接続経路でCLIを再起動
+    local new_cmd
+    if type build_cli_command_with_model &>/dev/null; then
+        new_cmd=$(build_cli_command_with_model "$AGENT_ID" "$target_model" 2>/dev/null)
+    fi
+    if [ -z "$new_cmd" ]; then
+        # フォールバック: 環境変数なし + 指定モデル
+        new_cmd="claude --model ${target_model} --dangerously-skip-permissions"
+    fi
+
+    echo "[$(date)] [CONNECTION-SWITCH] Sending new CLI command: ${new_cmd:0:80}..." >&2
+    timeout 5 tmux send-keys -t "$PANE_TARGET" "$new_cmd" 2>/dev/null || true
+    sleep 0.3
+    timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null || true
+    sleep 3
+
+    # Step 3: 再起動後の自動復帰通知をキュー
+    local recovery_id
+    recovery_id=$(enqueue_recovery_task_assigned)
+    if [ -n "$recovery_id" ] && [ "$recovery_id" != "SKIP_DUPLICATE" ] && [ "$recovery_id" != "ERROR" ]; then
+        echo "[$(date)] [CONNECTION-SWITCH] Auto-recovery queued for $AGENT_ID ($recovery_id)" >&2
     fi
 }
 
@@ -689,15 +737,6 @@ send_wakeup() {
         return 0
     fi
 
-    # Shogun: if the pane is focused AND a human is attached, never inject keys
-    # (it can clobber the Lord's input). Show a tmux message instead.
-    # If session is detached, no human is watching — safe to send-keys normally.
-    if [ "$AGENT_ID" = "shogun" ] && pane_is_active && session_has_client; then
-        echo "[$(date)] [DISPLAY] shogun pane is active + attached — showing nudge: inbox${unread_count}" >&2
-        timeout 2 tmux display-message -t "$PANE_TARGET" -d 5000 "inbox${unread_count}" 2>/dev/null || true
-        return 0
-    fi
-
     # 優先度3: tmux send-keys（テキストとEnterを分離 — Codex TUI対策）
     echo "[$(date)] [SEND-KEYS] Sending nudge to $PANE_TARGET for $AGENT_ID" >&2
 
@@ -847,6 +886,12 @@ for s in data.get('specials', []):
         local msg_type msg_content cmd
         while IFS=$'\t' read -r msg_type msg_content; do
             [ -n "$msg_type" ] || continue
+            # connection_switch: cost_groupをまたぐモデル切替（/clear + 新CLIコマンド）
+            if [ "$msg_type" = "connection_switch" ]; then
+                send_connection_switch "$msg_content"
+                clear_seen=1  # /clearを内包しているため復帰通知は不要だが整合性のため
+                continue
+            fi
             if [ "$msg_type" = "clear_command" ]; then
                 clear_seen=1
             fi
@@ -857,6 +902,8 @@ for s in data.get('specials', []):
 
     # /clear は Codex で /new へ変換される。再起動直後の取りこぼし防止として
     # 追加 task_assigned を自動投入し、次サイクルで確実に wake-up 可能にする。
+    # connection_switch も内部で enqueue_recovery_task_assigned を呼ぶが、
+    # clear_seen=1 が設定されるため二重投入のガードが効いて安全。
     if [ "$clear_seen" -eq 1 ]; then
         local recovery_id
         recovery_id=$(enqueue_recovery_task_assigned)
