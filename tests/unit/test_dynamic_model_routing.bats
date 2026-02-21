@@ -220,6 +220,66 @@ analysis:
   confidence: 2.0
 YAML
 
+    # cmd_204 接続経路分離テスト用: provider_config定義あり
+    cat > "${TEST_TMP}/settings_provider_config.yaml" << 'YAML'
+cli:
+  default: claude
+  agents:
+    shogun:
+      type: claude
+      model: claude-sonnet-4-6
+    karo:
+      type: claude
+      model: claude-sonnet-4-6
+    gunshi:
+      type: claude
+      model: claude-sonnet-4-6
+    ashigaru1:
+      type: claude
+      model: z-ai/glm-4.7
+    ashigaru2:
+      type: claude
+      model: z-ai/glm-4.7
+capability_tiers:
+  claude-opus-4-6:
+    max_bloom: 6
+    cost_group: claude_max
+  claude-sonnet-4-6:
+    max_bloom: 5
+    cost_group: claude_max
+  z-ai/glm-4.7:
+    max_bloom: 4
+    cost_group: openrouter
+available_cost_groups:
+  - claude_max
+  - openrouter
+provider_config:
+  claude_max:
+    env_prefix: ""
+  openrouter:
+    env_prefix: "ANTHROPIC_BASE_URL=https://openrouter.ai/api ANTHROPIC_AUTH_TOKEN=${OPENROUTER_API_KEY} ANTHROPIC_API_KEY=''"
+YAML
+
+    # provider_config未定義（後方互換テスト）
+    cat > "${TEST_TMP}/settings_no_provider_config.yaml" << 'YAML'
+cli:
+  default: claude
+  agents:
+    shogun:
+      type: claude
+      model: claude-sonnet-4-6
+    ashigaru1:
+      type: claude
+      model: z-ai/glm-4.7
+capability_tiers:
+  claude-sonnet-4-6:
+    max_bloom: 5
+    cost_group: claude_max
+  z-ai/glm-4.7:
+    max_bloom: 4
+    cost_group: openrouter
+YAML
+
     # .venvへのsymlinkを作成
     if [ -d "${PROJECT_ROOT}/.venv" ]; then
         ln -sf "${PROJECT_ROOT}/.venv" "${TEST_TMP}/.venv"
@@ -847,4 +907,130 @@ print(len(doc.get('history', [])))
     load_adapter_with "${TEST_TMP}/settings_no_tiers.yaml"
     result=$(validate_subscription_coverage)
     [ "$result" = "unconfigured" ]
+}
+
+# =============================================================================
+# cmd_204 接続経路分離: TC-DMR-500〜512
+# provider_configによるcost_group別env_prefix注入のテスト
+# =============================================================================
+
+# --- TC-DMR-500〜503: get_env_prefix ---
+
+@test "TC-DMR-500: get_env_prefix openrouter returns ANTHROPIC_BASE_URL prefix" {
+    load_adapter_with "${TEST_TMP}/settings_provider_config.yaml"
+    result=$(get_env_prefix "openrouter")
+    [[ "$result" == *"ANTHROPIC_BASE_URL"* ]]
+    [[ "$result" == *"ANTHROPIC_AUTH_TOKEN"* ]]
+    [[ "$result" == *"ANTHROPIC_API_KEY"* ]]
+}
+
+@test "TC-DMR-501: get_env_prefix claude_max returns empty string" {
+    load_adapter_with "${TEST_TMP}/settings_provider_config.yaml"
+    result=$(get_env_prefix "claude_max")
+    [ "$result" = "" ]
+}
+
+@test "TC-DMR-502: get_env_prefix no provider_config defined returns empty string" {
+    load_adapter_with "${TEST_TMP}/settings_no_provider_config.yaml"
+    result=$(get_env_prefix "openrouter")
+    [ "$result" = "" ]
+}
+
+@test "TC-DMR-503: get_env_prefix empty input returns empty string" {
+    load_adapter_with "${TEST_TMP}/settings_provider_config.yaml"
+    result=$(get_env_prefix "")
+    [ "$result" = "" ]
+}
+
+# --- TC-DMR-510~512: build_cli_command connection path separation ---
+
+@test "TC-DMR-510: build_cli_command shogun (claude_max) does NOT contain ANTHROPIC_BASE_URL" {
+    load_adapter_with "${TEST_TMP}/settings_provider_config.yaml"
+    result=$(build_cli_command "shogun")
+    # claude_max: no env_prefix
+    [[ "$result" != *"ANTHROPIC_BASE_URL"* ]]
+    # model and flag included
+    [[ "$result" == *"claude-sonnet-4-6"* ]]
+    [[ "$result" == *"--dangerously-skip-permissions"* ]]
+}
+
+@test "TC-DMR-511: build_cli_command ashigaru1 (openrouter) DOES contain ANTHROPIC_BASE_URL" {
+    load_adapter_with "${TEST_TMP}/settings_provider_config.yaml"
+    result=$(build_cli_command "ashigaru1")
+    # openrouter: env_prefix injected
+    [[ "$result" == *"ANTHROPIC_BASE_URL=https://openrouter.ai/api"* ]]
+    [[ "$result" == *"ANTHROPIC_AUTH_TOKEN"* ]]
+    # model and flag included
+    [[ "$result" == *"z-ai/glm-4.7"* ]]
+    [[ "$result" == *"--dangerously-skip-permissions"* ]]
+}
+
+@test "TC-DMR-512: build_cli_command no provider_config backward compatible (no env_prefix)" {
+    load_adapter_with "${TEST_TMP}/settings_no_provider_config.yaml"
+    result=$(build_cli_command "ashigaru1")
+    # no provider_config: no env_prefix (backward compatible)
+    [[ "$result" != *"ANTHROPIC_BASE_URL"* ]]
+    [[ "$result" == *"--dangerously-skip-permissions"* ]]
+}
+
+# =============================================================================
+# cmd_205 connection_switch: TC-DMR-520~532
+# needs_connection_switch と build_cli_command_with_model のテスト
+# =============================================================================
+
+# --- TC-DMR-520~523: needs_connection_switch ---
+
+@test "TC-DMR-520: needs_connection_switch GLM-4.7 to L5 returns yes (cross_cost_group)" {
+    load_adapter_with "${TEST_TMP}/settings_provider_config.yaml"
+    # z-ai/glm-4.7 max_bloom=4, L5 requires claude-sonnet-4-6 (claude_max)
+    result=$(needs_connection_switch "z-ai/glm-4.7" 5 2>/dev/null)
+    [ "$result" = "yes" ]
+}
+
+@test "TC-DMR-521: needs_connection_switch GLM-4.7 to L4 returns no (no switch needed)" {
+    load_adapter_with "${TEST_TMP}/settings_provider_config.yaml"
+    # z-ai/glm-4.7 max_bloom=4, L4 is within capability
+    result=$(needs_connection_switch "z-ai/glm-4.7" 4 2>/dev/null)
+    [ "$result" = "no" ]
+}
+
+@test "TC-DMR-522: needs_connection_switch sonnet to L5 returns no (same cost_group)" {
+    load_adapter_with "${TEST_TMP}/settings_provider_config.yaml"
+    # claude-sonnet-4-6 → claude-sonnet-4-6 (same claude_max group, no switch needed)
+    result=$(needs_connection_switch "claude-sonnet-4-6" 5 2>/dev/null)
+    [ "$result" = "no" ]
+}
+
+@test "TC-DMR-523: needs_connection_switch no capability_tiers returns skip" {
+    load_adapter_with "${TEST_TMP}/settings_no_tiers.yaml"
+    result=$(needs_connection_switch "z-ai/glm-4.7" 5 2>/dev/null)
+    [ "$result" = "skip" ]
+}
+
+# --- TC-DMR-530~532: build_cli_command_with_model ---
+
+@test "TC-DMR-530: build_cli_command_with_model ashigaru + sonnet gives Anthropic-direct command" {
+    load_adapter_with "${TEST_TMP}/settings_provider_config.yaml"
+    result=$(build_cli_command_with_model "ashigaru1" "claude-sonnet-4-6")
+    # claude_max: no env_prefix
+    [[ "$result" != *"ANTHROPIC_BASE_URL"* ]]
+    [[ "$result" == *"claude-sonnet-4-6"* ]]
+    [[ "$result" == *"--dangerously-skip-permissions"* ]]
+}
+
+@test "TC-DMR-531: build_cli_command_with_model ashigaru + glm-4.7 gives OpenRouter command" {
+    load_adapter_with "${TEST_TMP}/settings_provider_config.yaml"
+    result=$(build_cli_command_with_model "ashigaru1" "z-ai/glm-4.7")
+    # openrouter: env_prefix injected
+    [[ "$result" == *"ANTHROPIC_BASE_URL=https://openrouter.ai/api"* ]]
+    [[ "$result" == *"z-ai/glm-4.7"* ]]
+    [[ "$result" == *"--dangerously-skip-permissions"* ]]
+}
+
+@test "TC-DMR-532: build_cli_command_with_model shogun + sonnet gives Anthropic-direct command" {
+    load_adapter_with "${TEST_TMP}/settings_provider_config.yaml"
+    result=$(build_cli_command_with_model "shogun" "claude-sonnet-4-6")
+    [[ "$result" != *"ANTHROPIC_BASE_URL"* ]]
+    [[ "$result" == *"claude-sonnet-4-6"* ]]
+    [[ "$result" == *"--dangerously-skip-permissions"* ]]
 }

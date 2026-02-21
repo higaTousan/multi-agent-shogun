@@ -754,9 +754,10 @@ PY
     [ "$status" -ne 0 ]
 }
 
-# --- T-SHOGUN-003: shogun + active pane + client attached → display-message only ---
+# --- T-SHOGUN-003: shogun + active pane + client attached → send-keys (not display-message) ---
+# Fix: display-message does not reach Claude Code's input. Use send-keys for shogun too.
 
-@test "T-SHOGUN-003: send_wakeup shogun + active + attached uses display-message only" {
+@test "T-SHOGUN-003: send_wakeup shogun + active + attached uses send-keys (not display-message)" {
     run bash -c '
         MOCK_PANE_ACTIVE="1"
         MOCK_LIST_CLIENTS="/dev/pts/1: mock_session [200x50 xterm-256color]"
@@ -766,11 +767,11 @@ PY
     '
     [ "$status" -eq 0 ]
 
-    # display-message was used for nudge
-    echo "$output" | grep -q "DISPLAY"
+    # display-message should NOT be used (it does not reach Claude Code input)
+    ! echo "$output" | grep -q "DISPLAY"
 
-    # send-keys with inbox should NOT have occurred
-    ! grep -q "send-keys.*inbox" "$MOCK_LOG"
+    # send-keys with inbox should have occurred
+    grep -q "send-keys.*inbox2" "$MOCK_LOG"
 }
 
 # --- T-SHOGUN-004: shogun + active pane + no client → send-keys fallthrough ---
@@ -790,4 +791,40 @@ PY
 
     # Should have used send-keys
     grep -q "send-keys.*inbox2" "$MOCK_LOG"
+}
+
+# =============================================================================
+# cmd_205 connection_switch: T-CONN-001~003
+# send_connection_switch と inbox_watcher.sh connection_switch対応のテスト
+# =============================================================================
+
+@test "T-CONN-001: send_connection_switch is defined in inbox_watcher.sh" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        type send_connection_switch
+    '
+    [ "$status" -eq 0 ]
+}
+
+@test "T-CONN-002: inbox_watcher.sh includes connection_switch in special_types" {
+    grep -q "connection_switch" "$WATCHER_SCRIPT"
+    grep -q 'special_types.*connection_switch\|connection_switch.*special_types' "$WATCHER_SCRIPT" || \
+        grep -q '"connection_switch"' "$WATCHER_SCRIPT"
+}
+
+@test "T-CONN-003: send_connection_switch sends /clear then new CLI command" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        # Mock build_cli_command_with_model to avoid settings.yaml dependency
+        build_cli_command_with_model() {
+            echo "claude --model claude-sonnet-4-6 --dangerously-skip-permissions"
+        }
+        export -f build_cli_command_with_model
+        send_connection_switch "claude-sonnet-4-6" 2>/dev/null
+    '
+    [ "$status" -eq 0 ]
+    # /clear must have been sent
+    grep -q "send-keys.*/clear" "$MOCK_LOG" || grep -q 'send-keys.*C-c' "$MOCK_LOG"
+    # New CLI command must have been sent
+    grep -q "send-keys.*claude-sonnet-4-6" "$MOCK_LOG"
 }
