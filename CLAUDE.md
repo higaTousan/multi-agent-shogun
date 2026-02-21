@@ -64,6 +64,15 @@ language:
 1. Identify self: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
 2. `mcp__memory__read_graph` — restore rules, preferences, lessons **(shogun/karo/gunshi only. ashigaru skip this step — task YAML is sufficient)**
 3. **Read your instructions file**: shogun→`instructions/shogun.md`, karo→`instructions/karo.md`, ashigaru→`instructions/ashigaru.md`, gunshi→`instructions/gunshi.md`. **NEVER SKIP** — even if a conversation summary exists. Summaries do NOT preserve persona, speech style, or forbidden actions.
+
+   **[必須] 読み込み完了後、最初の発話の第1行目に以下を出力せよ（省略禁止）:**
+   ```
+   [INST: {agent_id} | ckpt: {instructionsファイルに記載のチェックポイントコード}]
+   ```
+   チェックポイントコードはinstructionsファイル内にのみ記載されている。
+   CLAUDE.mdには値を書かない。実際に読まないと正確に宣言できない。
+   省略または不正確な宣言は「読み込み未実施」の証拠とみなす。
+
 4. Rebuild state from primary YAML data (queue/, tasks/, reports/)
 5. Review forbidden actions, then start work
 
@@ -176,7 +185,7 @@ Race condition is eliminated: `/clear` wipes old context. Agent re-reads YAML wi
 |-----------|--------|--------|
 | Ashigaru → Gunshi | Report YAML + inbox_write | Quality check & dashboard aggregation |
 | Gunshi → Karo | Report YAML + inbox_write | Quality check result + strategic reports |
-| Karo → Shogun/Lord | dashboard.md update only | **inbox to shogun FORBIDDEN** — prevents interrupting Lord's input |
+| Karo → Shogun/Lord | dashboard.md update + inbox_write to shogun | **cmd完了報告は必須**（殿の直命） |
 | Karo → Gunshi | YAML + inbox_write | Strategic task or quality check delegation |
 | Top → Down | YAML + inbox_write | Standard wake-up |
 
@@ -207,12 +216,41 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 6. **Skill candidates**: Ashigaru reports include `skill_candidate:`. Karo collects → dashboard. Shogun approves → creates design doc.
 7. **Action Required Rule (CRITICAL)**: ALL items needing Lord's decision → dashboard.md 🚨要対応 section. ALWAYS. Even if also written elsewhere. Forgetting = Lord gets angry.
 
+# Git Commit & PR Language Rules (all agents)
+
+**殿の直命 2026-02-19追加。すべてのプロジェクト・全エージェントに適用。例外なし。**
+
+1. **コミットメッセージは日本語で書け** — `fix: usersテーブルにbirthdateカラムを再追加`
+2. **PR説明（タイトル・本文）は日本語で書け** — `gh pr create --title "日本語タイトル" ...`
+3. **英語は技術用語・コード内のみ許可**（変数名・エラーメッセージ等はそのまま）
+4. **prefixは英語可**: `fix:`, `feat:`, `refactor:`, `chore:` — ただし本文は日本語
+
 # Test Rules (all agents)
 
 1. **SKIP = FAIL**: テスト報告でSKIP数が1以上なら「テスト未完了」扱い。「完了」と報告してはならない。
 2. **Preflight check**: テスト実行前に前提条件（依存ツール、エージェント稼働状態等）を確認。満たせないなら実行せず報告。
 3. **E2Eテストは家老が担当**: 全エージェント操作権限を持つ家老がE2Eを実行。足軽はユニットテストのみ。
 4. **テスト計画レビュー**: 家老はテスト計画を事前レビューし、前提条件の実現可能性を確認してから実行に移す。
+
+# Std Process Rules (all agents)
+
+**殿の直命 2026-02-21追加。すべてのプロジェクト・全エージェントに適用。例外なし。**
+
+全cmdは以下の標準手順（std_process）に従うこと: `Strategy → Spec → Test → Implement → Verify`
+
+1. **新機能実装（文言・解説文を含むもの）は事前にSpec承認が必要**
+   - 「解説文は既存フォーマットに倣って実装すること」という指示は「仮テキストで実装してよい」という意味ではない
+   - 仮テキストを使用した場合は必ずレポートで明記し、正式承認まで「仮」と明示すること
+2. **Spec不要タスクの例外**（以下はSpec不要とみなす）:
+   - 用語統一・表記修正など仕様が自明なタスク（「占い→鑑定」等）
+   - 削除タスク（「陰陽辞書削除」等）
+   - 会議議事録が明示的に参照されており、かつ文言が承認済みであるタスク
+3. **cmdテンプレートの`spec_doc`フィールド**: cmdではSpec文書のパスまたは不要理由を明示すること
+   ```yaml
+   spec_doc: "docs/specs/feature_xxx.md"      # 仕様書あり
+   spec_doc: "spec_not_required"              # 用語統一・削除等の自明タスク
+   spec_doc: "docs/meetings/2026-02-19.md"   # 会議議事録がSpec代わり
+   ```
 
 # Critical Thinking Rule (all agents)
 
@@ -221,6 +259,45 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 3. **問題の早期報告**: 実行中に前提崩れや設計欠陥を検知したら、即座に inbox で共有する。
 4. **過剰批判の禁止**: 批判だけで停止しない。判断不能でない限り、最善案を選んで前進する。
 5. **実行バランス**: 「批判的検討」と「実行速度」の両立を常に優先する。
+
+# External API Investigation Rules (all agents)
+
+外部API・サービス・モデルの可用性を調査する際は以下を厳守すること（cmd_215 postmortem 2026-02-19追加）:
+
+1. **モデルID全列挙**: プロバイダーの検索画面で関連モデルを全列挙し、バージョン違い・サフィックス違い・別名を必ず確認すること。
+   - 例: `deepseek-v3-0324` を調査するなら `deepseek/deepseek-v3.2`, `deepseek-chat`, `deepseek-v3` も確認
+2. **1つのIDで「不可」禁止**: 単一のモデルIDで「利用不可」「存在しない」と結論を出してはならない。
+3. **ネガティブ判定の根拠明示**: 「利用不可」判定時は、試行したURL・モデルID・エラー内容をレポートに正確に記載すること。根拠なき「不可」判定は「調査不十分」とみなす。
+4. **エビデンス必須**: 調査レポートには公式ドキュメントのURL・APIエンドポイント・実測結果を記載すること。
+
+**前例（cmd_211 postmortem）**: 足軽1が `deepseek-v3-0324`（旧ID）を調べて「利用不可」と結論。実際は `deepseek/deepseek-v3.2`（現行ID）が利用可能だった。この誤りが軍師レポートに伝播し、最終推奨が誤った方向に傾いた。詳細: `queue/reports/postmortem_cmd211_model_id.md`
+
+# Blast Radius Check (all agents)
+
+インフラ変更（環境変数・設定ファイル・起動スクリプト・ネットワーク設定等）を実施する際は、以下を必ず実施すること:
+
+1. **影響エージェント列挙**: 変更が影響するエージェント/プロセスを全て列挙する。
+2. **意図しない影響の確認**: 変更対象外のエージェントが誤って影響を受けないことを確認する。
+3. **レポートへの記載**: 完了レポートに「影響範囲」セクションを含める。
+
+例: ANTHROPIC_BASE_URL をグローバル設定した場合 → 将軍・家老・軍師の接続もOpenRouter経由になる（想定外）
+
+# E2E Walkthrough (all agents)
+
+多層にまたがる機能（Bloomルーティング・接続経路等）の実装完了報告前に、以下を必ず実施すること:
+
+1. **全経路追跡**: 起動スクリプト → cli_adapter → 環境変数 → 実際のAPIコール の全経路を追跡する。
+2. **全エージェント検証**: 将軍・家老・足軽・軍師の各種別で実際に生成されるコマンドを出力・確認する。
+3. **動作確認**: 「設定を変えた」だけでなく「実際に動く」ことを確認するまで完了としない。
+
+具体例（cmd_204以降の標準手順）:
+```bash
+source lib/cli_adapter.sh
+echo "将軍: $(build_cli_command shogun)"    # ANTHROPIC_BASE_URL 含まれてはならない
+echo "家老: $(build_cli_command karo)"      # ANTHROPIC_BASE_URL 含まれてはならない
+echo "足軽1: $(build_cli_command ashigaru1)" # ANTHROPIC_BASE_URL が含まれていなければならない
+echo "軍師: $(build_cli_command gunshi)"    # ANTHROPIC_BASE_URL 含まれてはならない
+```
 
 # Destructive Operation Safety (all agents)
 
