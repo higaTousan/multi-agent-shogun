@@ -120,14 +120,53 @@ except Exception as e:
     fi
 }
 
+# get_env_prefix(cost_group)
+# 指定cost_groupの環境変数プレフィックスを返す
+# provider_config未定義 or cost_group未定義 → 空文字列
+# Note: コストグループ名にスラッシュを含む場合があるためシェル展開は使わない
+get_env_prefix() {
+    local cost_group="$1"
+
+    if [[ -z "$cost_group" ]]; then
+        echo ""
+        return 0
+    fi
+
+    local result
+    result=$("$CLI_ADAPTER_PROJECT_ROOT/.venv/bin/python3" -c "
+import yaml, sys
+try:
+    with open('${CLI_ADAPTER_SETTINGS}') as f:
+        cfg = yaml.safe_load(f) or {}
+    provider_config = cfg.get('provider_config')
+    if not provider_config or not isinstance(provider_config, dict):
+        print(''); sys.exit(0)
+    spec = provider_config.get('${cost_group}')
+    if not spec or not isinstance(spec, dict):
+        print(''); sys.exit(0)
+    env_prefix = spec.get('env_prefix', '')
+    print(env_prefix if env_prefix else '')
+except Exception:
+    print('')
+" 2>/dev/null)
+
+    echo "$result"
+}
+
 # build_cli_command(agent_id)
 # エージェントを起動するための完全なコマンド文字列を返す
+# cost_groupに応じた環境変数プレフィックスを自動付与（接続経路分離）
 build_cli_command() {
     local agent_id="$1"
     local cli_type
     cli_type=$(get_cli_type "$agent_id")
     local model
     model=$(get_agent_model "$agent_id")
+
+    # cost_group → env_prefix を解決（接続経路分離）
+    local cost_group env_prefix
+    cost_group=$(get_cost_group "$model")
+    env_prefix=$(get_env_prefix "$cost_group")
 
     case "$cli_type" in
         claude)
@@ -136,7 +175,11 @@ build_cli_command() {
                 cmd="$cmd --model $model"
             fi
             cmd="$cmd --dangerously-skip-permissions"
-            echo "$cmd"
+            if [[ -n "$env_prefix" ]]; then
+                echo "${env_prefix} ${cmd}"
+            else
+                echo "$cmd"
+            fi
             ;;
         codex)
             local cmd="codex"
@@ -144,7 +187,11 @@ build_cli_command() {
                 cmd="$cmd --model $model"
             fi
             cmd="$cmd --dangerously-bypass-approvals-and-sandbox --no-alt-screen"
-            echo "$cmd"
+            if [[ -n "$env_prefix" ]]; then
+                echo "${env_prefix} ${cmd}"
+            else
+                echo "$cmd"
+            fi
             ;;
         copilot)
             echo "copilot --yolo"
@@ -154,7 +201,11 @@ build_cli_command() {
             if [[ -n "$model" ]]; then
                 cmd="$cmd --model $model"
             fi
-            echo "$cmd"
+            if [[ -n "$env_prefix" ]]; then
+                echo "${env_prefix} ${cmd}"
+            else
+                echo "$cmd"
+            fi
             ;;
         *)
             echo "claude --dangerously-skip-permissions"
@@ -574,6 +625,103 @@ get_switch_recommendation() {
     fi
 
     echo "${recommended}:${transition}"
+}
+
+# needs_connection_switch(current_model, bloom_level)
+# cost_groupをまたぐモデル切替が必要か判定（接続経路切替の必要性）
+# 出力: "yes" (connection_switch必要 — /clear+再起動が必要)
+#        "no"  (同一cost_group内切替 — /modelで足りる、またはswitch不要)
+#        "skip" (判定不可 — capability_tiers未定義等)
+# cross_cost_group切替は環境変数ごと変える必要があるため/modelでは不足
+needs_connection_switch() {
+    local current_model="$1"
+    local bloom_level="$2"
+
+    # needs_model_switch で "skip"（判定不可）を先に確認
+    local switch_needed
+    switch_needed=$(needs_model_switch "$current_model" "$bloom_level")
+    if [[ "$switch_needed" == "skip" ]]; then
+        echo "skip"
+        return 0
+    fi
+
+    local recommendation
+    recommendation=$(get_switch_recommendation "$current_model" "$bloom_level")
+
+    if [[ "$recommendation" == "no_switch" ]]; then
+        echo "no"
+        return 0
+    fi
+
+    # format: "{recommended_model}:{transition_type}"
+    local transition_type="${recommendation##*:}"
+    if [[ "$transition_type" == "cross_cost_group" ]]; then
+        echo "yes"
+    elif [[ "$transition_type" == "same_cost_group" ]]; then
+        echo "no"
+    else
+        echo "skip"
+    fi
+}
+
+# build_cli_command_with_model(agent_id, model_override)
+# 指定モデルでエージェントを起動するコマンド文字列を返す
+# build_cli_commandの拡張版: settings.yamlのモデル設定ではなく model_override を使う
+# connection_switch時に一時的なモデル切替コマンドを生成するために使用
+build_cli_command_with_model() {
+    local agent_id="$1"
+    local model_override="$2"
+    local cli_type
+    cli_type=$(get_cli_type "$agent_id")
+
+    # model_override の cost_group → env_prefix を解決
+    local cost_group env_prefix
+    cost_group=$(get_cost_group "$model_override")
+    env_prefix=$(get_env_prefix "$cost_group")
+
+    case "$cli_type" in
+        claude)
+            local cmd="claude"
+            if [[ -n "$model_override" ]]; then
+                cmd="$cmd --model $model_override"
+            fi
+            cmd="$cmd --dangerously-skip-permissions"
+            if [[ -n "$env_prefix" ]]; then
+                echo "${env_prefix} ${cmd}"
+            else
+                echo "$cmd"
+            fi
+            ;;
+        codex)
+            local cmd="codex"
+            if [[ -n "$model_override" ]]; then
+                cmd="$cmd --model $model_override"
+            fi
+            cmd="$cmd --dangerously-bypass-approvals-and-sandbox --no-alt-screen"
+            if [[ -n "$env_prefix" ]]; then
+                echo "${env_prefix} ${cmd}"
+            else
+                echo "$cmd"
+            fi
+            ;;
+        copilot)
+            echo "copilot --yolo"
+            ;;
+        kimi)
+            local cmd="kimi --yolo"
+            if [[ -n "$model_override" ]]; then
+                cmd="$cmd --model $model_override"
+            fi
+            if [[ -n "$env_prefix" ]]; then
+                echo "${env_prefix} ${cmd}"
+            else
+                echo "$cmd"
+            fi
+            ;;
+        *)
+            echo "claude --dangerously-skip-permissions"
+            ;;
+    esac
 }
 
 # can_model_switch(cli_type)
