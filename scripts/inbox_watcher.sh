@@ -254,6 +254,11 @@ normalize_special_command() {
                 echo "[$(date)] [SKIP] Invalid model_switch payload for $AGENT_ID: ${raw_content:-<empty>}" >&2
             fi
             ;;
+        cli_restart)
+            # cli_restart is handled externally by switch_cli.sh, not via send_cli_command.
+            # Emit a marker so the main loop can call switch_cli.sh.
+            echo "__CLI_RESTART__:${raw_content}"
+            ;;
     esac
 }
 
@@ -382,7 +387,7 @@ try:
 
     messages = data.get("messages", []) or []
     unread = [m for m in messages if not m.get("read", False)]
-    special_types = ("clear_command", "model_switch")
+    special_types = ("clear_command", "model_switch", "cli_restart")
     specials = [m for m in unread if m.get("type") in special_types]
 
     if specials:
@@ -425,6 +430,18 @@ send_cli_command() {
     local cmd="$1"
     local effective_cli
     effective_cli=$(get_effective_cli_type)
+
+    # cli_restart: delegate to switch_cli.sh (full /exit → relaunch cycle)
+    if [[ "$cmd" == __CLI_RESTART__:* ]]; then
+        local restart_args="${cmd#__CLI_RESTART__:}"
+        echo "[$(date)] [CLI-RESTART] Delegating to switch_cli.sh for $AGENT_ID: ${restart_args}" >&2
+        bash "${SCRIPT_DIR}/scripts/switch_cli.sh" "$AGENT_ID" $restart_args 2>&1 | while IFS= read -r line; do  # SCRIPT_DIR=project_root
+            echo "[$(date)] [switch_cli] $line" >&2
+        done
+        # Update effective CLI type after restart
+        CLI_TYPE=$(tmux show-options -p -t "$PANE_TARGET" -v @agent_cli 2>/dev/null || echo "$CLI_TYPE")
+        return 0
+    fi
 
     # Safety: never inject CLI commands into the shogun pane.
     # Shogun is controlled by the Lord; keystroke injection can clobber human input.

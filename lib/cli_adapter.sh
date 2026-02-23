@@ -122,12 +122,23 @@ except Exception as e:
 
 # build_cli_command(agent_id)
 # エージェントを起動するための完全なコマンド文字列を返す
+# settings.yaml の thinking: false → MAX_THINKING_TOKENS=0 を先頭に付与
 build_cli_command() {
     local agent_id="$1"
     local cli_type
     cli_type=$(get_cli_type "$agent_id")
     local model
     model=$(get_agent_model "$agent_id")
+    local thinking
+    thinking=$(_cli_adapter_read_yaml "cli.agents.${agent_id}.thinking" "")
+
+    # thinking prefix: Claude CLI でのみ有効
+    # thinking: true or 未設定 → そのまま（デフォルトでThinking ON）
+    # thinking: false → MAX_THINKING_TOKENS=0 を先頭に付与
+    local prefix=""
+    if [[ "$cli_type" == "claude" && "$thinking" == "false" || "$thinking" == "False" ]]; then
+        prefix="MAX_THINKING_TOKENS=0 "
+    fi
 
     case "$cli_type" in
         claude)
@@ -136,7 +147,7 @@ build_cli_command() {
                 cmd="$cmd --model $model"
             fi
             cmd="$cmd --dangerously-skip-permissions"
-            echo "$cmd"
+            echo "${prefix}${cmd}"
             ;;
         codex)
             local cmd="codex"
@@ -274,6 +285,48 @@ get_agent_model() {
             esac
             ;;
     esac
+}
+
+# get_model_display_name(agent_id)
+# pane-border-format 用の短い表示名を返す
+# Format: "{ShortName}" or "{ShortName}+T" (thinking enabled)
+# Examples: Sonnet, Opus+T, Haiku, Codex, Spark
+get_model_display_name() {
+    local agent_id="$1"
+    local model
+    model=$(get_agent_model "$agent_id")
+    local cli_type
+    cli_type=$(get_cli_type "$agent_id")
+    local thinking
+    thinking=$(_cli_adapter_read_yaml "cli.agents.${agent_id}.thinking" "")
+
+    # モデル名 → 短縮表示名
+    local short=""
+    case "$model" in
+        *spark*)                short="Spark" ;;
+        *codex*|gpt-5.3)        short="Codex" ;;
+        *opus*)                 short="Opus" ;;
+        *sonnet*)               short="Sonnet" ;;
+        *haiku*)                short="Haiku" ;;
+        *k2.5*|*kimi*)          short="Kimi" ;;
+        *)
+            # CLI種別から推測
+            case "$cli_type" in
+                codex)   short="Codex" ;;
+                copilot) short="Copilot" ;;
+                kimi)    short="Kimi" ;;
+                *)       short="$model" ;;
+            esac
+            ;;
+    esac
+
+    # Thinking表示: 明示的に設定されている場合のみ "+T" を付与
+    # thinking: true → "+T", thinking: false or 未設定 → なし
+    if [[ "$thinking" == "true" || "$thinking" == "True" ]]; then
+        echo "${short}+T"
+    else
+        echo "$short"
+    fi
 }
 
 # get_startup_prompt(agent_id)
