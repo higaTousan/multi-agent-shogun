@@ -3,7 +3,7 @@ name: shogun-readme-sync
 description: README.md（英語）とREADME_ja.md（日本語）の同期を確認・実行するスキル。README変更時に両言語版を必ず同時更新するために使用。「README更新」「README同期」「readme sync」で起動。
 ---
 
-# /readme-sync - README日英同期
+# /shogun-readme-sync - README日英同期
 
 ## Overview
 
