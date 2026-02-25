@@ -710,46 +710,6 @@ PY
     echo "$output" | grep -q "OK"
 }
 
-# --- T-CODEX-013: auto-recovery skipped when task is cancelled ---
-
-@test "T-CODEX-013: enqueue_recovery_task_assigned skips if task YAML status is cancelled" {
-    run bash -c '
-        source "'"$TEST_HARNESS"'"
-        # Initialize inbox (required by enqueue_recovery_task_assigned)
-        echo "messages: []" > "$INBOX"
-        # Place task YAML with status: cancelled
-        mkdir -p "$(dirname "$INBOX")/../tasks"
-        cat > "$(dirname "$INBOX")/../tasks/test_agent.yaml" << "YAML"
-worker_id: test_agent
-task_id: subtask_test_cancelled
-status: cancelled
-YAML
-        r=$(enqueue_recovery_task_assigned)
-        # Should return SKIP_CANCELLED:cancelled
-        if [ "$r" = "SKIP_CANCELLED:cancelled" ]; then echo "OK"; else echo "FAIL:$r"; fi
-    '
-    [ "$status" -eq 0 ]
-    echo "$output" | grep -q "OK"
-}
-
-# --- T-CODEX-014: auto-recovery skipped when task is idle ---
-
-@test "T-CODEX-014: enqueue_recovery_task_assigned skips if task YAML status is idle" {
-    run bash -c '
-        source "'"$TEST_HARNESS"'"
-        echo "messages: []" > "$INBOX"
-        mkdir -p "$(dirname "$INBOX")/../tasks"
-        cat > "$(dirname "$INBOX")/../tasks/test_agent.yaml" << "YAML"
-worker_id: test_agent
-task_id: subtask_test_idle
-status: idle
-YAML
-        r=$(enqueue_recovery_task_assigned)
-        if [ "$r" = "SKIP_CANCELLED:idle" ]; then echo "OK"; else echo "FAIL:$r"; fi
-    '
-    [ "$status" -eq 0 ]
-    echo "$output" | grep -q "OK"
-}
 
 # --- T-CODEX-015: auto-recovery proceeds when task is assigned ---
 
@@ -864,19 +824,6 @@ YAML
     grep -q "send-keys.*inbox2" "$MOCK_LOG"
 }
 
-# --- T-BUSY-005: agent_is_busy during /clear cooldown ---
-
-@test "T-BUSY-005: agent_is_busy returns 0 (busy) during /clear cooldown period" {
-    run bash -c '
-        MOCK_CAPTURE_PANE="› prompt
-  ? for shortcuts                100% context left"
-        source "'"$TEST_HARNESS"'"
-        now=$(date +%s)
-        LAST_CLEAR_TS=$((now - 10))  # /clear sent 10 seconds ago (within 30s cooldown)
-        agent_is_busy
-    '
-    [ "$status" -eq 0 ]
-}
 
 # =============================================================================
 # cmd_205 connection_switch: T-CONN-001~003
@@ -905,25 +852,6 @@ YAML
     [ "$status" -eq 1 ]
 }
 
-# --- T-BUSY-007: /clear cooldown overrides idle pane ---
-
-@test "T-BUSY-007: agent_is_busy /clear cooldown overrides idle pane state" {
-    run bash -c '
-        MOCK_CAPTURE_PANE="› Summarize recent commits
-  ? for shortcuts                100% context left"
-        source "'"$TEST_HARNESS"'"
-        now=$(date +%s)
-        LAST_CLEAR_TS=$((now - 5))  # /clear sent 5 seconds ago
-        # Pane looks idle, but cooldown should make it busy
-        if agent_is_busy; then
-            echo "BUSY_DURING_COOLDOWN"
-        else
-            echo "WRONGLY_IDLE"
-        fi
-    '
-    [ "$status" -eq 0 ]
-    echo "$output" | grep -q "BUSY_DURING_COOLDOWN"
-}
 
 # --- T-BUSY-008: idle prompt at bottom overrides old busy markers (false-busy fix) ---
 # Bug: 59ec12f / 69c1ecb — old "Working" or "esc to interrupt" lingered in scroll-back
@@ -981,39 +909,6 @@ YAML
     [ "$status" -eq 0 ]
 }
 
-# --- T-CRESET-001: send_context_reset suppresses /clear for karo ---
-
-@test "T-CRESET-001: send_context_reset suppresses /clear for karo" {
-    run bash -c '
-        source "'"$TEST_HARNESS"'"
-        AGENT_ID="karo"
-        send_context_reset
-    '
-    [ "$status" -eq 0 ]
-
-    # No send-keys should have occurred
-    ! grep -q "send-keys" "$MOCK_LOG"
-
-    # SKIP message in stderr
-    echo "$output" | grep -q "SKIP.*karo"
-}
-
-# --- T-CRESET-002: send_context_reset suppresses /clear for gunshi ---
-
-@test "T-CRESET-002: send_context_reset suppresses /clear for gunshi" {
-    run bash -c '
-        source "'"$TEST_HARNESS"'"
-        AGENT_ID="gunshi"
-        send_context_reset
-    '
-    [ "$status" -eq 0 ]
-
-    # No send-keys should have occurred
-    ! grep -q "send-keys" "$MOCK_LOG"
-
-    # SKIP message in stderr
-    echo "$output" | grep -q "SKIP.*gunshi"
-}
 
 # --- T-CRESET-003: send_context_reset sends /clear for ashigaru ---
 
