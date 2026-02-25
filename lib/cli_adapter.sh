@@ -3,7 +3,7 @@
 # Multi-CLI統合設計書 (reports/design_multi_cli_support.md) §2.2 準拠
 #
 # 提供関数:
-#   get_cli_type(agent_id)                  → "claude" | "codex" | "copilot" | "kimi"
+#   get_cli_type(agent_id)                  → "claude" | "codex" | "copilot" | "kimi" | "gemini"
 #   build_cli_command(agent_id)             → 完全なコマンド文字列
 #   get_instruction_file(agent_id [,cli_type]) → 指示書パス
 #   validate_cli_availability(cli_type)     → 0=OK, 1=NG
@@ -16,7 +16,7 @@ CLI_ADAPTER_PROJECT_ROOT="$(cd "${CLI_ADAPTER_DIR}/.." && pwd)"
 CLI_ADAPTER_SETTINGS="${CLI_ADAPTER_SETTINGS:-${CLI_ADAPTER_PROJECT_ROOT}/config/settings.yaml}"
 
 # 許可されたCLI種別
-CLI_ADAPTER_ALLOWED_CLIS="claude codex copilot kimi"
+CLI_ADAPTER_ALLOWED_CLIS="claude codex copilot kimi gemini"
 
 # --- 内部ヘルパー ---
 
@@ -87,18 +87,18 @@ try:
         print('claude'); sys.exit(0)
     agents = cli.get('agents', {})
     if not isinstance(agents, dict):
-        print(cli.get('default', 'claude') if cli.get('default', 'claude') in ('claude','codex','copilot','kimi') else 'claude')
+        print(cli.get('default', 'claude') if cli.get('default', 'claude') in ('claude','codex','copilot','kimi','gemini') else 'claude')
         sys.exit(0)
     agent_cfg = agents.get('${agent_id}')
     if isinstance(agent_cfg, dict):
         t = agent_cfg.get('type', '')
-        if t in ('claude', 'codex', 'copilot', 'kimi'):
+        if t in ('claude', 'codex', 'copilot', 'kimi', 'gemini'):
             print(t); sys.exit(0)
     elif isinstance(agent_cfg, str):
-        if agent_cfg in ('claude', 'codex', 'copilot', 'kimi'):
+        if agent_cfg in ('claude', 'codex', 'copilot', 'kimi', 'gemini'):
             print(agent_cfg); sys.exit(0)
     default = cli.get('default', 'claude')
-    if default in ('claude', 'codex', 'copilot', 'kimi'):
+    if default in ('claude', 'codex', 'copilot', 'kimi', 'gemini'):
         print(default)
     else:
         print('claude', file=sys.stderr)
@@ -207,6 +207,17 @@ build_cli_command() {
                 echo "$cmd"
             fi
             ;;
+        gemini)
+            local cmd="gemini --yolo"
+            if [[ -n "$model" ]]; then
+                cmd="$cmd --model $model"
+            fi
+            if [[ -n "$env_prefix" ]]; then
+                echo "${env_prefix} ${cmd}"
+            else
+                echo "$cmd"
+            fi
+            ;;
         *)
             echo "claude --dangerously-skip-permissions"
             ;;
@@ -236,6 +247,7 @@ get_instruction_file() {
         codex)   echo "instructions/codex-${role}.md" ;;
         copilot) echo ".github/copilot-instructions-${role}.md" ;;
         kimi)    echo "instructions/generated/kimi-${role}.md" ;;
+        gemini)  echo "instructions/gemini-${role}.md" ;;
         *)       echo "instructions/${role}.md" ;;
     esac
 }
@@ -269,6 +281,12 @@ validate_cli_availability() {
                 echo "[ERROR] Kimi CLI not found. Install from https://platform.moonshot.cn/" >&2
                 return 1
             fi
+            ;;
+        gemini)
+            command -v gemini &>/dev/null || {
+                echo "[ERROR] Gemini CLI not found. Install with: npm install -g @google/gemini-cli" >&2
+                return 1
+            }
             ;;
         *)
             echo "[ERROR] Unknown CLI type: '$cli_type'. Allowed: $CLI_ADAPTER_ALLOWED_CLIS" >&2
@@ -331,7 +349,7 @@ get_agent_model() {
 # CLIが初回起動時に自動実行すべき初期プロンプトを返す
 # Codex CLI: [PROMPT]引数として渡す（サジェストUI停止問題の根本対策）
 # Claude Code: 空（CLAUDE.md自動読込でSession Start手順が起動）
-# Copilot/Kimi: 空（今後対応）
+# Copilot/Kimi/Gemini: 空（今後対応）
 get_startup_prompt() {
     local agent_id="$1"
     local cli_type
@@ -339,6 +357,9 @@ get_startup_prompt() {
 
     case "$cli_type" in
         codex)
+            echo "Session Start — do ALL of this in one turn, do NOT stop early: 1) tmux display-message -t \"\$TMUX_PANE\" -p '#{@agent_id}' to identify yourself. 2) Read queue/tasks/${agent_id}.yaml. 3) Read queue/inbox/${agent_id}.yaml, mark read:true. 4) Read files listed in context_files. 5) Execute the assigned task to completion — edit files, run commands, write reports. Keep working until the task is done."
+            ;;
+        gemini)
             echo "Session Start — do ALL of this in one turn, do NOT stop early: 1) tmux display-message -t \"\$TMUX_PANE\" -p '#{@agent_id}' to identify yourself. 2) Read queue/tasks/${agent_id}.yaml. 3) Read queue/inbox/${agent_id}.yaml, mark read:true. 4) Read files listed in context_files. 5) Execute the assigned task to completion — edit files, run commands, write reports. Keep working until the task is done."
             ;;
         *)
@@ -718,6 +739,17 @@ build_cli_command_with_model() {
                 echo "$cmd"
             fi
             ;;
+        gemini)
+            local cmd="gemini --yolo"
+            if [[ -n "$model_override" ]]; then
+                cmd="$cmd --model $model_override"
+            fi
+            if [[ -n "$env_prefix" ]]; then
+                echo "${env_prefix} ${cmd}"
+            else
+                echo "$cmd"
+            fi
+            ;;
         *)
             echo "claude --dangerously-skip-permissions"
             ;;
@@ -735,6 +767,7 @@ can_model_switch() {
         codex)   echo "limited" ;;
         copilot) echo "none" ;;
         kimi)    echo "none" ;;
+        gemini)  echo "limited" ;;
         *)       echo "none" ;;
     esac
 }
@@ -1066,12 +1099,14 @@ get_model_display_name() {
         *sonnet*)               short="Sonnet" ;;
         *haiku*)                short="Haiku" ;;
         *k2.5*|*kimi*)          short="Kimi" ;;
+        *gemini*|*flash*)       short="Gemini" ;;
         *)
             # CLI種別から推測
             case "$cli_type" in
                 codex)   short="Codex" ;;
                 copilot) short="Copilot" ;;
                 kimi)    short="Kimi" ;;
+                gemini)  short="Gemini" ;;
                 *)       short="$model" ;;
             esac
             ;;
