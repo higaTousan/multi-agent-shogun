@@ -10,6 +10,17 @@
           }
         ]
       }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/build_instructions.sh",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   },
   "permissions": {
