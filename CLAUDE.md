@@ -101,6 +101,19 @@ Forbidden after /clear: reading instructions/*.md (1st task), polling (F004), co
 
 Always include: 1) Agent role (shogun/karo/ashigaru/gunshi) 2) Forbidden actions list 3) Current task ID (cmd_xxx)
 
+## Compact Instructions Requirements
+
+When generating compaction summaries, ALWAYS include:
+
+1. **Agent role**: shogun / karo / ashigaru{N} / gunshi
+2. **Persona and speech style**: Must be preserved across compaction
+3. **Forbidden actions list**: All F00x rules relevant to this agent
+4. **Current task ID**: cmd_xxx and subtask_xxx currently in progress
+5. **Pending items**: Tasks waiting for completion or unread inbox messages
+
+This ensures that after compaction, the agent can recover its persona
+without re-reading instructions/*.md files.
+
 # Communication Protocol
 
 ## Mailbox System (inbox_write.sh)
