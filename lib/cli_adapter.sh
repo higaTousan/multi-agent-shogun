@@ -209,7 +209,7 @@ build_cli_command() {
             ;;
         gemini)
             local cmd="gemini --yolo"
-            if [[ -n "$model" ]]; then
+            if [[ -n "$model" && "$model" != "auto" ]]; then
                 cmd="$cmd --model $model"
             fi
             if [[ -n "$env_prefix" ]]; then
@@ -741,7 +741,7 @@ build_cli_command_with_model() {
             ;;
         gemini)
             local cmd="gemini --yolo"
-            if [[ -n "$model_override" ]]; then
+            if [[ -n "$model_override" && "$model_override" != "auto" ]]; then
                 cmd="$cmd --model $model_override"
             fi
             if [[ -n "$env_prefix" ]]; then
