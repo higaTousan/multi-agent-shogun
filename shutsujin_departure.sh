@@ -706,9 +706,13 @@ if [ "$SETUP_ONLY" = false ]; then
     tmux send-keys -t "multiagent:agents.${p}" Enter
     log_info "  └─ 家老（${_karo_cli_type}）、召喚完了"
 
+    # settings.yaml に定義された有効な足軽のみ起動
+    _active_ashigaru_ids=$(get_ashigaru_ids 2>/dev/null || echo "ashigaru1 ashigaru2 ashigaru3 ashigaru4 ashigaru5 ashigaru6 ashigaru7")
+
     if [ "$KESSEN_MODE" = true ]; then
         # 決戦の陣: CLI Adapter経由（claudeはOpus強制）
-        for i in {1..7}; do
+        for agent_id in $_active_ashigaru_ids; do
+            i="${agent_id#ashigaru}"
             p=$((PANE_BASE + i))
             _ashi_cli_type="claude"
             _ashi_cmd="claude --model opus --dangerously-skip-permissions"
@@ -729,10 +733,11 @@ if [ "$SETUP_ONLY" = false ]; then
             tmux send-keys -t "multiagent:agents.${p}" "$_ashi_cmd"
             tmux send-keys -t "multiagent:agents.${p}" Enter
         done
-        log_info "  └─ 足軽1-7（決戦の陣）、召喚完了"
+        log_info "  └─ 足軽（決戦の陣）、召喚完了"
     else
         # 平時の陣: CLI Adapter経由（デフォルト: 全足軽=Sonnet）
-        for i in {1..7}; do
+        for agent_id in $_active_ashigaru_ids; do
+            i="${agent_id#ashigaru}"
             p=$((PANE_BASE + i))
             _ashi_cli_type="claude"
             _ashi_cmd="claude --model sonnet --dangerously-skip-permissions"
@@ -749,7 +754,7 @@ if [ "$SETUP_ONLY" = false ]; then
             tmux send-keys -t "multiagent:agents.${p}" "$_ashi_cmd"
             tmux send-keys -t "multiagent:agents.${p}" Enter
         done
-        log_info "  └─ 足軽1-7（平時の陣）、召喚完了"
+        log_info "  └─ 足軽（平時の陣）、召喚完了"
     fi
 
     # 軍師（pane 8）: Opus Thinking — 戦略立案・設計判断専任
@@ -891,7 +896,8 @@ NINJA_EOF
     disown
 
     # 足軽のwatcher
-    for i in {1..7}; do
+    for agent_id in $_active_ashigaru_ids; do
+        i="${agent_id#ashigaru}"
         p=$((PANE_BASE + i))
         _ashi_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${p}" -v @agent_cli 2>/dev/null || echo "claude")
         nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" "ashigaru${i}" "multiagent:agents.${p}" "$_ashi_watcher_cli" \
