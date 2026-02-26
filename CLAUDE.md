@@ -272,6 +272,19 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 
 **前例（cmd_211 postmortem）**: 足軽1が `deepseek-v3-0324`（旧ID）を調べて「利用不可」と結論。実際は `deepseek/deepseek-v3.2`（現行ID）が利用可能だった。この誤りが軍師レポートに伝播し、最終推奨が誤った方向に傾いた。詳細: `queue/reports/postmortem_cmd211_model_id.md`
 
+# Information Freshness Rule (all agents)
+
+**殿の直命 2026-02-26追加。すべてのプロジェクト・全エージェントに適用。例外なし。**
+
+外部ツール・API・モデル・CLIを使用するcmdでは、設計・実装前に必ず最新情報を調査せよ。古い情報での設計は出戻り工数の原因となる。
+
+1. **調査ファースト**: 外部ツール・モデル・APIを使うcmdは、設計前に軍師または担当足軽が最新の公式情報（バージョン・モデルID・料金・制限）を確認すること。
+2. **古いモデルIDの使用禁止**: 知識カットオフ時点のモデルIDをそのまま使うな。必ずWebSearchで現時点の最新IDを確認してから設計に入ること。
+3. **調査結果をSpecまたはcmdに明記**: 「調査済みモデル一覧」「採用理由」をcmdまたはSpec文書に記載すること。
+4. **設計後に新バージョンが判明した場合**: 速やかに設計を修正し、家老に報告すること。実装着手済みの場合は中断して確認を仰ぐ。
+
+**前例（cmd_246 postmortem）**: Gemini 2.5-flashを指定して設計・実装したが、Gemini 3系がすでに利用可能だった。後から殿がモデルIDを差し替え。調査ファーストで防げた出戻り。
+
 # Blast Radius Check (all agents)
 
 インフラ変更（環境変数・設定ファイル・起動スクリプト・ネットワーク設定等）を実施する際は、以下を必ず実施すること:
