@@ -10,7 +10,8 @@
 ## 1. 概要・目的
 
 Obsidianデイリーノート（`00.Daily/YYYY/YYYY-MM-DD.md`）の frontmatter（`date`・`summary`・`tags`）を、
-ローカルOllama（gemma3:12b）を使って毎日0:15に自動生成するスクリプトとlaunchdジョブを実装する。
+ローカルOllama（設定ファイルで管理するモデル、評価候補: gemma3:12b）を使って毎日0:15に自動生成するスクリプトとlaunchdジョブを実装する。
+gemma3:12bで品質評価を実施し、問題なければ正式採用する。
 
 **解決したい課題**:
 - デイリーノートを書いた後、frontmatterの記入が手作業で煩雑
@@ -62,7 +63,7 @@ tags: ["#ctx/家族", "#feel/安堵", "#lvl/4", "#対話", "#許し", "#関係�
 | フィールド | 型 | 説明 | 例 |
 |-----------|-----|------|-----|
 | `date` | string (YYYY-MM-DD) | ノートの日付 | `2025-12-29` |
-| `summary` | string | その日の1文要約（20〜60字） | `夜中に呼び止められ...` |
+| `summary` | string | その日の1文要約（100文字以内） | `夜中に呼び止められ...` |
 | `tags` | string[] | タグ配列（Obsidian形式） | `["#ctx/家族", ...]` |
 
 ### タグ命名規則（既存パターンより）
@@ -89,16 +90,7 @@ tags: ["#ctx/家族", "#feel/安堵", "#lvl/4", "#対話", "#許し", "#関係�
 ### 4.1 summary生成プロンプト
 
 ```
-あなたはObsidianの日記に添付するsummaryを生成するアシスタントです。
-
-以下のデイリーノートの本文を読み、その日の出来事・感情・気づきを
-日本語20〜60文字の1文で要約してください。
-
-ルール:
-- 事実に基づいて書く（本文にない情報を推測・追加しない）
-- 体言止めか「〜した」形式で簡潔に
-- 感情と出来事の両方を含める（可能な場合）
-- 出力はsummary文字列のみ（前後に説明・引用符不要）
+あなたは要約のプロです。今日のジャーナルセンテンスの内容を100文字以内で要約してください。
 
 【デイリーノート本文】
 {BODY_TEXT}
@@ -129,15 +121,22 @@ JSON配列のみを出力してください（前後に説明不要）:
 
 ## 5. Ollama設定
 
-### モデル: gemma3:12b
+### モデル設定（設定ファイルで管理）
 
 | 項目 | 値 |
 |------|----|
-| モデルID | `gemma3:12b` |
+| モデルID | 設定ファイルで管理（評価候補: `gemma3:12b`） |
 | 実装 | ローカルOllama |
-| 最大コンテキスト（公称） | 128K tokens |
+| 最大コンテキスト（公称） | 128K tokens（gemma3:12b使用時） |
 | Ollamaデフォルトコンテキスト | 8,192 tokens（要注意） |
 | 本スクリプトで使用するnum_ctx | **8,192**（デイリーノートは短いため十分） |
+
+**設定変数（スクリプト冒頭で定義）**:
+
+```bash
+# モデル設定（設定ファイル ~/Dev/Obsidian_root/config.sh で上書き可能）
+OLLAMA_MODEL="${OLLAMA_MODEL:-gemma3:12b}"
+```
 
 ### コンテキスト長の試算
 
@@ -161,9 +160,12 @@ if ! curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
   exit 1
 fi
 
-# gemma3:12bモデル確認
-if ! ollama list | grep -q "gemma3:12b"; then
-  log "ERROR: gemma3:12b not found. Run: ollama pull gemma3:12b"
+# 使用モデル設定（設定ファイルで変更可能）
+OLLAMA_MODEL="${OLLAMA_MODEL:-gemma3:12b}"
+
+# Ollamaモデル確認
+if ! ollama list | grep -q "$OLLAMA_MODEL"; then
+  log "ERROR: $OLLAMA_MODEL not found. Run: ollama pull $OLLAMA_MODEL"
   exit 1
 fi
 ```
@@ -241,7 +243,7 @@ BODY_TEXT=$(echo "$BODY_TEXT" | awk '/^---$/{f++; next} f==1{next} f>=2{print}')
 |-----------|------|
 | 対象ノートファイルが存在しない | ログ記録して終了（当日記録なしは正常） |
 | Ollama未起動 | ERROR ログ → 終了（ファイル変更なし） |
-| gemma3:12bモデル未pull | ERROR ログ → 終了 |
+| 使用モデル未pull（$OLLAMA_MODEL） | ERROR ログ → 終了 |
 | Ollamaレスポンスが不正（JSON解析失敗） | ERROR ログ → frontmatter書き込み中断 |
 | iCloudファイルロック（書き込み失敗） | リトライ3回 → 失敗時はERROR ログ |
 

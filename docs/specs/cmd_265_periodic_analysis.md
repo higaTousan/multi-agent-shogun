@@ -3,7 +3,7 @@
 **version**: 1.0
 **作成日**: 2026-02-28
 **作成者**: 軍師
-**ステータス**: 殿レビュー待ち（モデル選定の最終判断必要）
+**ステータス**: 殿レビュー待ち
 
 ---
 
@@ -35,7 +35,7 @@ Vault (iCloud):
         Weekly/
           Analysis_YYYY-MM-DD_YYYY-MM-DD.md   ← 出力: 週次レポート
         Monthly/
-          Monthly_YYYYMM.md                   ← 出力: 月次レポート（※既存確認必要）
+          Analysis_YYYY-MM.md                 ← 出力: 月次レポート（確定）
         Yearly/
           Yearly_YYYY.md                      ← 出力: 年次レポート
         Charts/
@@ -53,12 +53,6 @@ Vault (iCloud):
 ログ:
   ~/Dev/Obsidian_root/.periodic_analysis.log
 ```
-
-### 月次レポートの実際のパス（要確認）
-
-> ⚠️ 現在のVaultで月次レポートのディレクトリが `10.Meta/Analysis/Monthly/` か
-> 別のパスかを確認すること。`Analysis/` 直下に `Metanalysis_YYYY-MM-DD_YYYY-MM-DD.md` として
-> 週次レポートのみ存在する可能性がある。実装時にGlobで確認すること。
 
 ---
 
@@ -146,15 +140,17 @@ GEMINI.md「応答生成に関する厳格な原則」より:
 | gemini-2.0-flash | 1M tokens | 無料枠あり | 高品質 | △ 2026年6月退役予定 |
 | gemini-2.5-pro | 1M tokens | 有料 | 最高品質 | △ コスト要検討 |
 
-**軍師推奨モデル選定方針**:
-- 週次: gemma3:12b（Ollama）`num_ctx=16384`
-- 月次: gemma3:12b（Ollama）`num_ctx=32768`
-- 年次: **Gemini API（gemini-2.5-flash）** ← コスト0・1M context・品質高
+**評価プロセス（モデル確定前の手順）**:
+- gemma3:12b（Ollama）で実データを使い品質評価を行う
+- 評価結果に基づいてモデルを最終選定する
+- 評価観点: 出力品質・処理時間・GEMINI.mdルール遵守度
 
-ただし、**最終判断は殿への確認事項**（セクション8参照）。
+**暫定設定**（評価前の初期値、設定ファイルで変更可能）:
+- Ollamaモデル: 設定変数 `OLLAMA_MODEL`（評価候補: `gemma3:12b`）
+- Gemini APIモデル: 設定変数 `GEMINI_MODEL`（評価候補: `gemini-2.5-flash`）
 
 **参考: Gemini API最新モデルID（2026-02-28調査）**:
-- `gemini-2.5-flash` — 1M context、無料枠あり（現行推奨）
+- `gemini-2.5-flash` — 1M context、無料枠あり（現行候補）
 - `gemini-2.5-pro` — 1M context、有料
 - `gemini-2.0-flash` — 1M context、2026年6月退役予定
 - ※ WebSearch調査済み（情報鮮度ルール準拠）
@@ -188,7 +184,7 @@ GEMINI.md「応答生成に関する厳格な原則」より:
 4. Profile.md を読み込む（GEMINI.md原則0: メタ情報の事前読み込み）
 5. 直近週次レポートを読み込む（前回分析との照合用）
 6. GEMINI.md「長期分析」プロンプト + 収集データ を構築
-7. Ollama (gemma3:12b, num_ctx=16384) へ送信
+7. Ollama ($OLLAMA_MODEL, num_ctx=$OLLAMA_NUM_CTX_WEEKLY) へ送信
 8. 生成結果を 10.Meta/Analysis/Weekly/Analysis_YYYY-MM-DD_YYYY-MM-DD.md に保存
 9. Weekly_Scores.md を差分更新
 10. ログ記録
@@ -202,8 +198,8 @@ GEMINI.md「応答生成に関する厳格な原則」より:
 3. 既存の同月レポートが存在する場合はスキップ
 4. Profile.md を読み込む
 5. GEMINI.md「月次レポートテンプレート」プロンプト + 週次レポート を構築
-6. Ollama (gemma3:12b, num_ctx=32768) へ送信
-7. 生成結果を 10.Meta/Analysis/Monthly/Monthly_YYYYMM.md に保存
+6. Ollama ($OLLAMA_MODEL, num_ctx=$OLLAMA_NUM_CTX_MONTHLY) へ送信
+7. 生成結果を 10.Meta/Analysis/Monthly/Analysis_YYYY-MM.md に保存
 8. Monthly_Scores.md を差分更新
 9. ログ記録
 ```
@@ -216,7 +212,7 @@ GEMINI.md「応答生成に関する厳格な原則」より:
 3. 既存の同年レポートが存在する場合はスキップ
 4. Profile.md を読み込む
 5. GEMINI.md「長期分析」プロンプト + 月次レポート を構築
-6. Gemini API (gemini-2.5-flash) へ送信
+6. Gemini API ($GEMINI_MODEL) へ送信
 7. 生成結果を 10.Meta/Analysis/Yearly/Yearly_YYYY.md に保存
 8. Yearly_Scores.md を差分更新
 9. ログ記録
@@ -237,7 +233,25 @@ if [ -n "$PREV_REPORT" ]; then
 fi
 ```
 
-### 5.4 iCloud Vault直接編集の注意点
+### 5.4 設定変数（モデル・コンテキスト長）
+
+モデル名をハードコードせず、設定変数として管理する。設定ファイル `~/Dev/Obsidian_root/config.sh` で上書き可能。
+
+```bash
+# デフォルト設定（スクリプト冒頭または config.sh で定義）
+OLLAMA_MODEL="${OLLAMA_MODEL:-gemma3:12b}"
+OLLAMA_NUM_CTX_WEEKLY="${OLLAMA_NUM_CTX_WEEKLY:-16384}"
+OLLAMA_NUM_CTX_MONTHLY="${OLLAMA_NUM_CTX_MONTHLY:-32768}"
+GEMINI_MODEL="${GEMINI_MODEL:-gemini-2.5-flash}"
+
+# config.sh を使う場合のロード例
+CONFIG_FILE="$HOME/Dev/Obsidian_root/config.sh"
+[ -f "$CONFIG_FILE" ] && source "$CONFIG_FILE"
+```
+
+評価後、最終選定したモデルIDを `config.sh` に記録する。
+
+### 5.5 iCloud Vault直接編集の注意点
 
 | リスク | 対策 |
 |--------|------|
@@ -344,26 +358,20 @@ cat ~/Library/Mobile\ Documents/.../Charts/Weekly_Scores.md
 
 ## 8. 残課題・殿への確認事項
 
-### 🚨 A. モデル選定の最終判断（最重要）
+### A. モデル評価プロセス
 
-| 分析種別 | 軍師推奨 | 代替案 |
-|----------|---------|--------|
-| 週次 | gemma3:12b（Ollama, num_ctx=16384） | gemini-2.5-flash |
-| 月次 | gemma3:12b（Ollama, num_ctx=32768） | gemini-2.5-flash |
-| 年次 | **gemini-2.5-flash（Gemini API）** | gemma3:12b（128K設定）|
+モデルは確定せず、実データでの品質評価後に最終選定する。
 
-**確認事項**: 年次分析にGemini APIを使用してよいか？
-Gemini APIは現状 gemini-2.5-flash が無料枠あり（2026-02-28時点）。
-ただし無料枠の制限・キーの設定が必要。
+- **評価手順**: gemma3:12b（Ollama）で実データを使い品質評価を行う
+- **最終選定**: 評価結果に基づいてモデルを確定し、`config.sh` に記録する
+- **評価観点**: 出力品質・処理時間・GEMINI.mdルール遵守度
 
-**統一案（全分析をGemini APIに）**: 品質一貫性とセットアップ簡素化のため、
-週次・月次・年次すべてをGemini API（gemini-2.5-flash）にする選択肢もある。
-Ollamaの設定複雑さを避けられる。
+評価候補と設定変数はセクション4.2・5.4参照。
 
-### B. 月次レポートの既存パスの確認
+### B. 月次レポートのパス（確定）
 
-現在のVaultで月次レポートが存在するか、どのパスに保存されているかを確認すること。
-`10.Meta/Analysis/Monthly/` が存在しない場合は新規作成。
+月次レポートの保存先は `10.Meta/Analysis/Monthly/Analysis_YYYY-MM.md`（確定）。
+ディレクトリが存在しない場合はスクリプト内で `mkdir -p` により自動作成する。
 
 ### C. GEMINI.mdに記載されていない設計判断事項
 
@@ -375,10 +383,9 @@ Ollamaの設定複雑さを避けられる。
 2. **デイリーノートが存在しない日の扱い**: 旅行中など記録がない日がある場合
    → 軍師案: 存在するファイルのみ収集し、プロンプトに「N日分のデータ」と明記
 
-3. **生成レポートの命名規則の厳密化**:
+3. **生成レポートの命名規則（確定）**:
    - 週次: `Analysis_YYYY-MM-DD_YYYY-MM-DD.md`（現行と同じ）
-   - 月次: `Monthly_YYYYMM.md` か `Metanalysis_YYYY-MM-DD_YYYY-MM-DD.md` か？
-   → 現行の月次レポートが存在しないため確認が必要
+   - 月次: `Analysis_YYYY-MM.md`（確定）
 
 4. **スクリプトの実行中ログのObsidian表示**: `.periodic_analysis.log` は
    Vaultの外（`~/Dev/Obsidian_root/`）に置くため、Obsidianには表示されない。
