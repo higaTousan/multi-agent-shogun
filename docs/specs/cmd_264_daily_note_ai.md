@@ -134,8 +134,9 @@ JSON配列のみを出力してください（前後に説明不要）:
 **設定変数（スクリプト冒頭で定義）**:
 
 ```bash
-# モデル設定（設定ファイル ~/Dev/Obsidian_root/config.sh で上書き可能）
-OLLAMA_MODEL="${OLLAMA_MODEL:-gemma3:12b}"
+# LLM設定（設定ファイル ~/Dev/Obsidian_root/config.sh で上書き可能）
+LLM_MODEL="${LLM_MODEL:-gemma3:12b}"
+LLM_ENDPOINT="${LLM_ENDPOINT:-http://localhost:11434}"
 ```
 
 ### コンテキスト長の試算
@@ -154,18 +155,19 @@ OLLAMA_MODEL="${OLLAMA_MODEL:-gemma3:12b}"
 ### ローカル優先・フォールバック方式
 
 ```bash
+# LLM設定（設定ファイルで変更可能）
+LLM_MODEL="${LLM_MODEL:-gemma3:12b}"
+LLM_ENDPOINT="${LLM_ENDPOINT:-http://localhost:11434}"
+
 # Ollama稼働確認
-if ! curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+if ! curl -s "$LLM_ENDPOINT/api/tags" > /dev/null 2>&1; then
   log "ERROR: Ollama not running. Skip."
   exit 1
 fi
 
-# 使用モデル設定（設定ファイルで変更可能）
-OLLAMA_MODEL="${OLLAMA_MODEL:-gemma3:12b}"
-
 # Ollamaモデル確認
-if ! ollama list | grep -q "$OLLAMA_MODEL"; then
-  log "ERROR: $OLLAMA_MODEL not found. Run: ollama pull $OLLAMA_MODEL"
+if ! ollama list | grep -q "$LLM_MODEL"; then
+  log "ERROR: $LLM_MODEL not found. Run: ollama pull $LLM_MODEL"
   exit 1
 fi
 ```
@@ -243,7 +245,7 @@ BODY_TEXT=$(echo "$BODY_TEXT" | awk '/^---$/{f++; next} f==1{next} f>=2{print}')
 |-----------|------|
 | 対象ノートファイルが存在しない | ログ記録して終了（当日記録なしは正常） |
 | Ollama未起動 | ERROR ログ → 終了（ファイル変更なし） |
-| 使用モデル未pull（$OLLAMA_MODEL） | ERROR ログ → 終了 |
+| 使用モデル未pull（$LLM_MODEL） | ERROR ログ → 終了 |
 | Ollamaレスポンスが不正（JSON解析失敗） | ERROR ログ → frontmatter書き込み中断 |
 | iCloudファイルロック（書き込み失敗） | リトライ3回 → 失敗時はERROR ログ |
 

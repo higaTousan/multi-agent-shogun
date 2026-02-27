@@ -146,8 +146,8 @@ GEMINI.md「応答生成に関する厳格な原則」より:
 - 評価観点: 出力品質・処理時間・GEMINI.mdルール遵守度
 
 **暫定設定**（評価前の初期値、設定ファイルで変更可能）:
-- Ollamaモデル: 設定変数 `OLLAMA_MODEL`（評価候補: `gemma3:12b`）
-- Gemini APIモデル: 設定変数 `GEMINI_MODEL`（評価候補: `gemini-2.5-flash`）
+- Ollamaモデル: 設定変数 `LLM_MODEL`（評価候補: `gemma3:12b`）
+- クラウドLLMモデル: 設定変数 `LLM_CLOUD_MODEL`（評価候補: `gemini-2.5-flash`）
 
 **参考: Gemini API最新モデルID（2026-02-28調査）**:
 - `gemini-2.5-flash` — 1M context、無料枠あり（現行候補）
@@ -184,7 +184,7 @@ GEMINI.md「応答生成に関する厳格な原則」より:
 4. Profile.md を読み込む（GEMINI.md原則0: メタ情報の事前読み込み）
 5. 直近週次レポートを読み込む（前回分析との照合用）
 6. GEMINI.md「長期分析」プロンプト + 収集データ を構築
-7. Ollama ($OLLAMA_MODEL, num_ctx=$OLLAMA_NUM_CTX_WEEKLY) へ送信
+7. Ollama ($LLM_MODEL, num_ctx=$LLM_NUM_CTX_WEEKLY) へ送信
 8. 生成結果を 10.Meta/Analysis/Weekly/Analysis_YYYY-MM-DD_YYYY-MM-DD.md に保存
 9. Weekly_Scores.md を差分更新
 10. ログ記録
@@ -198,7 +198,7 @@ GEMINI.md「応答生成に関する厳格な原則」より:
 3. 既存の同月レポートが存在する場合はスキップ
 4. Profile.md を読み込む
 5. GEMINI.md「月次レポートテンプレート」プロンプト + 週次レポート を構築
-6. Ollama ($OLLAMA_MODEL, num_ctx=$OLLAMA_NUM_CTX_MONTHLY) へ送信
+6. LLM ($LLM_MODEL, num_ctx=$LLM_NUM_CTX_MONTHLY) へ送信
 7. 生成結果を 10.Meta/Analysis/Monthly/Analysis_YYYY-MM.md に保存
 8. Monthly_Scores.md を差分更新
 9. ログ記録
@@ -212,7 +212,7 @@ GEMINI.md「応答生成に関する厳格な原則」より:
 3. 既存の同年レポートが存在する場合はスキップ
 4. Profile.md を読み込む
 5. GEMINI.md「長期分析」プロンプト + 月次レポート を構築
-6. Gemini API ($GEMINI_MODEL) へ送信
+6. クラウドLLM API ($LLM_CLOUD_MODEL) へ送信
 7. 生成結果を 10.Meta/Analysis/Yearly/Yearly_YYYY.md に保存
 8. Yearly_Scores.md を差分更新
 9. ログ記録
@@ -239,10 +239,11 @@ fi
 
 ```bash
 # デフォルト設定（スクリプト冒頭または config.sh で定義）
-OLLAMA_MODEL="${OLLAMA_MODEL:-gemma3:12b}"
-OLLAMA_NUM_CTX_WEEKLY="${OLLAMA_NUM_CTX_WEEKLY:-16384}"
-OLLAMA_NUM_CTX_MONTHLY="${OLLAMA_NUM_CTX_MONTHLY:-32768}"
-GEMINI_MODEL="${GEMINI_MODEL:-gemini-2.5-flash}"
+# ※変数名はプロバイダー非依存化済み（評価後に確定予定）
+LLM_MODEL="${LLM_MODEL:-gemma3:12b}"
+LLM_NUM_CTX_WEEKLY="${LLM_NUM_CTX_WEEKLY:-16384}"
+LLM_NUM_CTX_MONTHLY="${LLM_NUM_CTX_MONTHLY:-32768}"
+LLM_CLOUD_MODEL="${LLM_CLOUD_MODEL:-gemini-2.5-flash}"
 
 # config.sh を使う場合のロード例
 CONFIG_FILE="$HOME/Dev/Obsidian_root/config.sh"
