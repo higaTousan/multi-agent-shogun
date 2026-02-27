@@ -108,6 +108,8 @@
 # Docs
 !docs/
 !docs/philosophy.md
+!docs/specs/
+!docs/specs/*.md
 
 # Screenshots (masked — no secrets)
 !images/
