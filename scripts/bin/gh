@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# gh_wrapper — upstream (yohey-w/*) への書き込み操作を物理封鎖するラッパー
+# cmd_276: 殿の直命 2026-02-28
+#
+# 書き込み操作: pr create/comment/review/merge/close, issue create/comment/close,
+#               release create, api POST/PATCH/PUT/DELETE など → yohey-w/* はBLOCK
+# 読み取り操作: view, list, search → 常にPASS
+# higaTousan/* への操作: 常にPASS
+
+set -euo pipefail
+
+# 本物のghのパス
+REAL_GH="/opt/homebrew/bin/gh"
+
+# 書き込みサブコマンド（サブコマンド + アクションのセット）
+WRITE_ACTIONS=(
+    "pr:create"
+    "pr:comment"
+    "pr:review"
+    "pr:merge"
+    "pr:close"
+    "pr:reopen"
+    "pr:edit"
+    "pr:ready"
+    "issue:create"
+    "issue:comment"
+    "issue:close"
+    "issue:reopen"
+    "issue:edit"
+    "issue:delete"
+    "issue:pin"
+    "release:create"
+    "release:upload"
+    "release:edit"
+    "release:delete"
+    "repo:fork"
+    "repo:create"
+    "repo:delete"
+    "repo:edit"
+    "repo:archive"
+    "repo:rename"
+    "label:create"
+    "label:edit"
+    "label:delete"
+    "milestone:create"
+    "milestone:edit"
+    "milestone:delete"
+    "secret:set"
+    "secret:delete"
+    "variable:set"
+    "variable:delete"
+    "workflow:run"
+    "workflow:enable"
+    "workflow:disable"
+    "gist:create"
+    "gist:edit"
+    "gist:delete"
+    "project:create"
+    "project:edit"
+    "project:item-add"
+)
+
+# 引数から --repo / -R の値を取得
+get_repo_arg() {
+    local args=("$@")
+    local i
+    for (( i=0; i<${#args[@]}; i++ )); do
+        local arg="${args[$i]}"
+        if [[ "$arg" == "--repo" || "$arg" == "-R" ]]; then
+            echo "${args[$((i+1))]:-}"
+            return
+        fi
+        if [[ "$arg" =~ ^--repo=(.+)$ ]]; then
+            echo "${BASH_REMATCH[1]}"
+            return
+        fi
+        if [[ "$arg" =~ ^-R(.+)$ ]]; then
+            echo "${BASH_REMATCH[1]}"
+            return
+        fi
+    done
+}
+
+# yohey-w のリポジトリかチェック
+is_yohey_w_repo() {
+    local repo="${1:-}"
+    [[ "$repo" == yohey-w/* ]] || \
+    [[ "$repo" == "github.com/yohey-w/"* ]] || \
+    [[ "$repo" == "https://github.com/yohey-w/"* ]]
+}
+
+# 書き込みサブコマンドかチェック（"subcmd:action" 形式）
+is_write_action() {
+    local subcmd="${1:-}"
+    local action="${2:-}"
+    local key="${subcmd}:${action}"
+    local wa
+    for wa in "${WRITE_ACTIONS[@]}"; do
+        if [[ "$key" == "$wa" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# BLOCKメッセージを表示して終了
+block_operation() {
+    local args=("$@")
+    echo "❌ BLOCKED: upstream (yohey-w) への書き込みは禁止されています" >&2
+    echo "   操作: gh ${args[*]}" >&2
+    echo "   理由: cmd_276 upstream write protection (2026-02-28)" >&2
+    echo "   対処: --repo higaTousan/... に変更するか、書き込み操作を取り消してください" >&2
+    exit 1
+}
+
+# ─────────────────────────────────────────────
+# メイン処理
+# ─────────────────────────────────────────────
+
+ARGS=("$@")
+SUBCMD="${ARGS[0]:-}"
+ACTION="${ARGS[1]:-}"
+
+# gh api コマンドの特別処理
+if [[ "$SUBCMD" == "api" ]]; then
+    # HTTP メソッドを取得（デフォルトは GET）
+    HTTP_METHOD="GET"
+    for (( i=0; i<${#ARGS[@]}; i++ )); do
+        arg="${ARGS[$i]}"
+        if [[ "$arg" == "-X" || "$arg" == "--method" ]]; then
+            HTTP_METHOD="${ARGS[$((i+1))]:-GET}"
+            break
+        fi
+        if [[ "$arg" =~ ^(-X|--method)=(.+)$ ]]; then
+            HTTP_METHOD="${BASH_REMATCH[2]}"
+            break
+        fi
+    done
+
+    # POST/PATCH/PUT/DELETE の場合はAPIパスにyohey-wが含まれるかチェック
+    if [[ "$HTTP_METHOD" =~ ^(POST|PATCH|PUT|DELETE)$ ]]; then
+        for arg in "${ARGS[@]}"; do
+            if [[ "$arg" == *"yohey-w"* ]] || [[ "$arg" == *"/repos/yohey-w/"* ]]; then
+                block_operation "${ARGS[@]}"
+            fi
+        done
+    fi
+
+    # GET（読み取り）はそのまま通過
+    exec "$REAL_GH" "${ARGS[@]}"
+fi
+
+# --repo の値を取得
+REPO_ARG="$(get_repo_arg "${ARGS[@]}")"
+
+# --repo 未指定の場合はカレントディレクトリのgit origin から判定
+if [[ -z "$REPO_ARG" ]]; then
+    REPO_ARG="$(git remote get-url origin 2>/dev/null | \
+        sed 's|.*github.com[:/]||' | \
+        sed 's|\.git$||' || echo "")"
+fi
+
+# 書き込みサブコマンド + yohey-w 組み合わせでBLOCK
+if is_write_action "$SUBCMD" "$ACTION" && is_yohey_w_repo "$REPO_ARG"; then
+    block_operation "${ARGS[@]}"
+fi
+
+# 通過: 本物のghを実行
+exec "$REAL_GH" "${ARGS[@]}"

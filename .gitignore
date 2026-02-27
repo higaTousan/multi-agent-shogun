@@ -95,6 +95,8 @@
 !scripts/seo_qc.sh
 !scripts/stop_hook_inbox.sh
 !scripts/agent_status.sh
+!scripts/bin/
+!scripts/bin/gh
 
 
 # SayTask (sample template only, not actual data)

@@ -510,7 +510,7 @@ tmux set-option -g aggressive-resize on
 
 # 将軍ペインはウィンドウ名 "main" で指定（base-index 1 環境でも動く）
 SHOGUN_PROMPT=$(generate_prompt "将軍" "magenta" "$SHELL_SETTING")
-tmux send-keys -t shogun:main "cd \"$(pwd)\" && export PS1='${SHOGUN_PROMPT}' && clear" Enter
+tmux send-keys -t shogun:main "cd \"$(pwd)\" && export PATH=\"$(pwd)/scripts/bin:\$PATH\" && export PS1='${SHOGUN_PROMPT}' && clear" Enter
 tmux select-pane -t shogun:main -P 'bg=#002b36'  # 将軍の Solarized Dark
 tmux set-option -p -t shogun:main @agent_id "shogun"
 
@@ -631,7 +631,7 @@ for i in {0..8}; do
     tmux set-option -p -t "multiagent:agents.${p}" @model_name "${MODEL_NAMES[$i]}"
     tmux set-option -p -t "multiagent:agents.${p}" @current_task ""
     PROMPT_STR=$(generate_prompt "${PANE_LABELS[$i]}" "${PANE_COLORS[$i]}" "$SHELL_SETTING")
-    tmux send-keys -t "multiagent:agents.${p}" "cd \"$(pwd)\" && export PS1='${PROMPT_STR}' && clear" Enter
+    tmux send-keys -t "multiagent:agents.${p}" "cd \"$(pwd)\" && export PATH=\"$(pwd)/scripts/bin:\$PATH\" && export PS1='${PROMPT_STR}' && clear" Enter
 done
 
 # 家老・軍師ペインの背景色（足軽との視覚的区別）
