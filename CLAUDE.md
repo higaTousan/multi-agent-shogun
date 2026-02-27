@@ -237,6 +237,7 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 2. **PR説明（タイトル・本文）は日本語で書け** — `gh pr create --title "日本語タイトル" ...`
 3. **英語は技術用語・コード内のみ許可**（変数名・エラーメッセージ等はそのまま）
 4. **prefixは英語可**: `fix:`, `feat:`, `refactor:`, `chore:` — ただし本文は日本語
+5. **PR送信前に /pr-preflight を実行せよ（殿の直命 2026-02-28追加）**: `gh pr create` 実行前に必ず `/pr-preflight` を実行し PASS を確認すること。BLOCK判定時はPR作成禁止。PR送信先は常に origin（higaTousan/*）。upstream（yohey-w/*）へのPR送信は絶対禁止。
 
 # Test Rules (all agents)
 
@@ -272,6 +273,14 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 3. **問題の早期報告**: 実行中に前提崩れや設計欠陥を検知したら、即座に inbox で共有する。
 4. **過剰批判の禁止**: 批判だけで停止しない。判断不能でない限り、最善案を選んで前進する。
 5. **実行バランス**: 「批判的検討」と「実行速度」の両立を常に優先する。
+
+# Work Quality & Autonomy Rules (all agents)
+
+**殿の直命 2026-02-28追加。すべてのプロジェクト・全エージェントに適用。例外なし。**
+
+1. **脱線時の即中断・再計画**: 作業が停滞したり、予期せぬエラーの連続や方向のズレを感じたら、即座に手を止めて計画を練り直すこと。「もう少しやれば解決するかも」と惰性で進めてはならない。中断→原因分析→再計画→再開。
+2. **品質の自問**: タスク完了前に「殿がこれを見て叱らないか？」と自問すること。命名・設計・テスト・ドキュメント — すべてにおいて、殿の水準を満たしているか確認してから完了とせよ。
+3. **自律的バグ修正**: バグや不具合を検知した場合、手取り足取りの指示を待つな。ログ・スタックトレース・関連コードを自力で調査し、原因を特定して修正すること。殿にコンテキストの再説明を求めるな。自分で読んで理解せよ。
 
 # External API Investigation Rules (all agents)
 
