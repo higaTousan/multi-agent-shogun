@@ -254,7 +254,7 @@ Kindle location参照（`^ref-XXXXX`）は除去してください。
 ### v1採用根拠
 
 1. **現状のPermanentNote数が少ない**: 3件のベクトルDBは探索コストに見合わない
-2. **LLMの文脈理解で十分**: gemma3:12bはプロンプト内に既存ノート例を渡せばリンク候補を類推できる
+2. **LLMの文脈理解で十分**: gemini-2.5-flashはプロンプト内に既存ノート例を渡せばリンク候補を類推できる
 3. **段階的実装**: まず動かして価値を検証してからv2拡張に進む方がリスクが低い
 
 **v2拡張のトリガー**: PermanentNote（手書き + draft確定済み）が20件を超えた時点で再検討。
@@ -267,13 +267,16 @@ cmd_264/265と同じ方針を踏襲する。
 
 ```bash
 # デフォルト設定（スクリプト冒頭・config.sh で上書き可能）
+LLM_CLOUD_MODEL="${LLM_CLOUD_MODEL:-gemini-2.5-flash}"
+LLM_CLOUD_ENDPOINT="${LLM_CLOUD_ENDPOINT:-https://generativelanguage.googleapis.com/v1beta/models}"
+GEMINI_API_KEY="${GEMINI_API_KEY:-}"
+# Ollama フォールバック（Gemini API失敗時）
 LLM_MODEL="${LLM_MODEL:-gemma3:12b}"
 LLM_ENDPOINT="${LLM_ENDPOINT:-http://localhost:11434}"
-LLM_NUM_CTX_ZETTELKASTEN="${LLM_NUM_CTX_ZETTELKASTEN:-16384}"
 ```
 
-**暫定採用**: gemma3:12b（Ollama）
-**確定方法**: cmd_268（Gemma品質評価）の結果を踏まえて`config.sh`に最終選定を記録。
+**採用**: gemini-2.5-flash（Gemini API）— daily/weekly/monthly/yearlyスクリプトと統一（cmd_277/278確定）
+**フォールバック**: Gemini API失敗時はOllama gemma3:12bにフォールバック
 
 ### トークン上限試算
 
@@ -420,7 +423,7 @@ CONFIG_FILE="$HOME/Dev/Obsidian_root/config.sh"
 3. 処理済みソースセットを構築（draft_*.mdのsource frontmatter逆引き）
 4. 優先順位に従い未処理ソースをスキャン（最大MAX_SOURCES_PER_RUN件）
 5. 各ソースに対してソース別プロンプトを構築
-6. Ollamaにリクエスト送信（$LLM_MODEL, num_ctx=$LLM_NUM_CTX_ZETTELKASTEN）
+6. Gemini APIにリクエスト送信（$LLM_CLOUD_MODEL）— 失敗時はOllama（$LLM_MODEL）にフォールバック
 7. レスポンスを---DRAFT_START---/---DRAFT_END---でパース
 8. draft_YYYYMMDD_NNN.md をアトミック書き込み（tmpファイル→mv）
 9. 生成できた件数をカウント
@@ -432,8 +435,8 @@ CONFIG_FILE="$HOME/Dev/Obsidian_root/config.sh"
 
 | エラー状況 | 動作 |
 |-----------|------|
-| Ollama未起動 | ERROR ログ → ntfy通知 → 終了 |
-| $LLM_MODEL未pull | ERROR ログ → ntfy通知 → 終了 |
+| Gemini API失敗（キーなし/レート超過） | Ollamaフォールバック → それも失敗でERROR ログ → ntfy通知 → 終了 |
+| Ollama未起動（フォールバック時） | ERROR ログ → ntfy通知 → 終了 |
 | LLMレスポンスが"NO_CANDIDATE" | ログ記録してスキップ（正常扱い） |
 | レスポンスパース失敗 | WARN ログ → そのソースをスキップ → 次のソースへ |
 | iCloudファイルロック | リトライ3回 → 失敗でERROR ログ |
@@ -513,7 +516,7 @@ mv "$TMP_FILE" "$VAULT/04.PermanentNote/draft_${DATE}_${SEQ}.md"
 | T2: Kindle処理 | 未処理Kindleノートあり | 原著引用なし・殿の言葉で再表現されたdraft生成 |
 | T3: 処理済み判定 | 同じソースを2回実行 | 2回目はスキップ（is_processed判定） |
 | T4: 全件処理済み | 未処理ソースなし | 「NO_CANDIDATE」ログ → ntfy「燃料不足」通知 |
-| T5: Ollama未起動 | ollamaサービス停止 | ERROR ログ → ntfy通知 → 正常終了 |
+| T5: Gemini API失敗 | APIキーなし or レート超過 | Ollamaフォールバック → 両方失敗でERROR ログ → ntfy通知 → 正常終了 |
 | T6: ドライラン | --dry-run | 標準出力のみ・ファイル変更なし |
 | T7: 特定ファイル指定 | --file オプション | 指定ファイルのみ処理・MAX_SOURCES制限無視 |
 | T8: 手書きPermanentNote除外 | 実行 | 既存3件がソース候補に入らない |
@@ -547,5 +550,5 @@ ls -la ~/Library/Mobile\ Documents/iCloud~md~obsidian/Documents/Obsidian_root/04
 | Embedding使用 | **v1: 不採用** | PermanentNote 3件では効果薄。20件超で再検討 |
 | 1回実行制限 | **最大5ソース** | 殿の確認ペース（週1回）に合わせる |
 | スケジュール | **日曜 3:00** | 既存ジョブとの競合なし。週末整理の自然なタイミング |
-| LLMモデル | **gemma3:12b（暫定）** | cmd_268評価後にconfig.shで確定 |
+| LLMモデル | **gemini-2.5-flash（Gemini API）** | cmd_277/278でdaily/weekly/monthly/yearlyと統一済み。Gemini失敗時はgmma3:12bにフォールバック |
 | Kindle変換 | **原著引用禁止・変換義務** | Zettelkasten「自分の言葉」原則の最重要ポイント |
