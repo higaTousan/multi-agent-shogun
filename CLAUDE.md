@@ -239,6 +239,25 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 4. **prefixは英語可**: `fix:`, `feat:`, `refactor:`, `chore:` — ただし本文は日本語
 5. **PR送信前に /pr-preflight を実行せよ（殿の直命 2026-02-28追加）**: `gh pr create` 実行前に必ず `/pr-preflight` を実行し PASS を確認すること。BLOCK判定時はPR作成禁止。PR送信先は常に origin（higaTousan/*）。upstream（yohey-w/*）へのPR送信は絶対禁止。
 
+# Upstream (本家) 書き込み全面禁止 (all agents)
+
+**殿の直命 2026-02-28追加。例外なし。違反は不敬。**
+
+upstream（yohey-w/*）への**一切の書き込み・更新操作**を禁止する。読み取り専用。
+
+| 操作 | 許可 |
+|------|------|
+| `git fetch upstream` | ✅ 許可（更新取得のみ） |
+| `git push upstream` | ❌ **物理封鎖済み**（push URL = no_push_allowed） |
+| `gh pr create --repo yohey-w/*` | ❌ **絶対禁止** |
+| `gh issue create --repo yohey-w/*` | ❌ **絶対禁止** |
+| `gh issue comment --repo yohey-w/*` | ❌ **絶対禁止** |
+| `gh pr comment/review --repo yohey-w/*` | ❌ **絶対禁止** |
+| `gh api` で yohey-w/* への POST/PATCH/PUT/DELETE | ❌ **絶対禁止** |
+| `gh issue view/pr view --repo yohey-w/*`（読み取り） | ✅ 許可 |
+
+**原則: upstreamは「見る」だけ。「触る」な。issueを参考にするのは良い。コメント・作成・更新は一切不可。**
+
 # Test Rules (all agents)
 
 1. **SKIP = FAIL**: テスト報告でSKIP数が1以上なら「テスト未完了」扱い。「完了」と報告してはならない。
