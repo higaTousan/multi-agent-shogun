@@ -1,0 +1,29 @@
+postmortem:
+  id: "PM-2026-001"
+  timestamp: "2026-02-19T00:25:00"
+  cmd_id: "cmd_211"
+  subtask_id: ""
+  recorded_by: "karo"
+  severity: "medium"
+  category: "info_accuracy"
+  tags: ["model_id", "openrouter", "negative_judgment"]
+  status: "active"
+  resolved_by: ""
+  title: "DeepSeek V3.2 モデルID誤判定（1つのIDで利用不可と結論）"
+  what_happened: |
+    足軽1号が deepseek-v3-0324（旧ID）のみを調査し「OpenRouterで利用不可」と報告。
+    実際は deepseek/deepseek-v3.2（現行ID）が利用可能だった。
+    軍師がネガティブ判定を独自検証せず採用し、最終レポートに誤りが混入。
+  why_not_detected: |
+    軍師がネガティブ判定の独自検証を行わず、足軽のレポートをそのまま採用した。
+    エビデンス（URL・エラー内容）なしの判定を採用基準としていなかった。
+  root_causes:
+    - why1: "単一のモデルIDのみ調査して「不可」と結論した"
+    - why2: "ネガティブ判定のエビデンス要件がチェックリストに存在しなかった"
+    - why3: "軍師が独自検証義務を持っていなかった"
+  systemic_improvements:
+    - "CLAUDE.md に『外部API調査ルール』追加（モデルID全列挙・ネガティブ判定のエビデンス必須）"
+    - "軍師instructions に『ネガティブ判定の独自検証義務』追加"
+  lessons:
+    - "『利用不可』は最も誤りやすい判定。バージョン違い・別名を必ず確認せよ"
+    - "エビデンスなき『不可』判定は調査不十分として扱え"

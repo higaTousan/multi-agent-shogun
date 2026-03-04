@@ -95,6 +95,7 @@
 !scripts/seo_qc.sh
 !scripts/stop_hook_inbox.sh
 !scripts/agent_status.sh
+!scripts/update_active_patterns.sh
 !scripts/bin/
 !scripts/bin/gh
 
@@ -113,10 +114,13 @@
 !docs/specs/
 !docs/specs/*.md
 
-# Postmortem learning system (ACTIVE_PATTERNS and summaries are OSS-safe; individual YAML excluded)
+# Postmortem learning system
 !queue/postmortems/
+!queue/postmortems/.gitkeep
+!queue/postmortems/*.yaml
 !queue/postmortems/ACTIVE_PATTERNS.md
 !queue/postmortems/summaries/
+!queue/postmortems/summaries/.gitkeep
 !queue/postmortems/summaries/*.md
 
 # Screenshots (masked — no secrets)

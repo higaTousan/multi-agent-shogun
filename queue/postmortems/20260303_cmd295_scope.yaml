@@ -1,0 +1,27 @@
+postmortem:
+  id: "PM-2026-003"
+  timestamp: "2026-03-03T13:20:00"
+  cmd_id: "cmd_295"
+  subtask_id: ""
+  recorded_by: "ashigaru1"
+  severity: "low"
+  category: "scope_omission"
+  tags: ["scope", "ollama", "zettelkasten"]
+  status: "active"
+  resolved_by: ""
+  title: "weekly/monthly/yearly Gemini移行時にzettelkastenが対象外"
+  what_happened: |
+    定期分析スクリプトのGemini移行時に、類似構造の zettelkasten パイプラインが移行対象から漏れた。
+    一部ジョブのみ旧経路のままとなり、運用整合性が崩れた。
+  why_not_detected: |
+    変更対象の網羅確認をファイル横断で実施せず、対象リストが担当者の記憶依存だった。
+    完了判定で「同名処理群の横断チェック」が無かった。
+  root_causes:
+    - why1: "移行対象一覧を機械的に抽出せず手作業で判断した"
+    - why2: "同系列スクリプトのgrep横断チェックを省略した"
+    - why3: "完了条件に『関連スクリプト全件確認』が含まれていなかった"
+  systemic_improvements:
+    - "モデル移行タスクに 'rg -n model_id scripts/' の実行証跡を必須化"
+    - "完了報告テンプレートに『対象外ファイルと理由』欄を追加"
+  lessons:
+    - "モデル移行時は全スクリプト横断でgrep確認せよ"

@@ -1,0 +1,27 @@
+postmortem:
+  id: "PM-2026-004"
+  timestamp: "2026-03-03T13:30:00"
+  cmd_id: "cmd_295"
+  subtask_id: ""
+  recorded_by: "ashigaru1"
+  severity: "medium"
+  category: "verification_gap"
+  tags: ["launchd", "log_check", "exit_code"]
+  status: "active"
+  resolved_by: ""
+  title: "launchdジョブのexit_code=0のみ確認でログ内容未チェック"
+  what_happened: |
+    launchdジョブの成否確認で exit_code=0 のみを見て完了扱いにした。
+    実際にはログに異常兆候が含まれていたが、内容確認を行わず誤報告につながった。
+  why_not_detected: |
+    検証手順がプロセス終了コード中心で、ログ本文確認の必須ステップが無かった。
+    レビュー側もログ抜粋提示を要求していなかった。
+  root_causes:
+    - why1: "完了判定をexit_code単独に依存した"
+    - why2: "ログ本文確認をチェックリストに定義していなかった"
+    - why3: "報告テンプレートにログ証跡欄が無かった"
+  systemic_improvements:
+    - "launchd検証テンプレートに『ログ先頭/末尾20行』添付を必須化"
+    - "exit_code=0 のみで完了判定不可ルールを明文化"
+  lessons:
+    - "exit_code=0は『プロセスが死ななかった』だけ。ログ内容も必ず確認せよ"

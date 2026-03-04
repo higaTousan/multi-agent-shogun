@@ -1,0 +1,27 @@
+postmortem:
+  id: "PM-2026-002"
+  timestamp: "2026-03-03T13:10:00"
+  cmd_id: "cmd_295"
+  subtask_id: ""
+  recorded_by: "ashigaru1"
+  severity: "medium"
+  category: "env_mismatch"
+  tags: ["python", "launchd", "version_mismatch"]
+  status: "active"
+  resolved_by: ""
+  title: "Python 3.10+型構文をlaunchd（Python 3.9）で使用"
+  what_happened: |
+    launchd実行系で /usr/bin/python3（3.9.6）が使われる環境で、X | None 型構文を含むスクリプトを投入した。
+    実行時に型ヒント解釈でエラーとなり、定期処理が停止した。
+  why_not_detected: |
+    実行前のpreflightで launchd 側Pythonバージョンを固定確認していなかった。
+    手元実行とlaunchd実行で環境差を検証するチェックが不足していた。
+  root_causes:
+    - why1: "ランタイム前提（Python 3.10+）を明示せずに実装した"
+    - why2: "launchd実行環境との差分検証がテスト計画に無かった"
+    - why3: "型構文互換性チェックの自動化が未整備だった"
+  systemic_improvements:
+    - "launchd系Pythonスクリプトは Optional[X] を必須とするlintルールを追加"
+    - "preflightに '/usr/bin/python3 --version' 検証を追加"
+  lessons:
+    - "launchd実行系は /usr/bin/python3 = 3.9.6。X|None禁止、Optional[X]を使え"
