@@ -113,6 +113,12 @@
 !docs/specs/
 !docs/specs/*.md
 
+# Postmortem learning system (ACTIVE_PATTERNS and summaries are OSS-safe; individual YAML excluded)
+!queue/postmortems/
+!queue/postmortems/ACTIVE_PATTERNS.md
+!queue/postmortems/summaries/
+!queue/postmortems/summaries/*.md
+
 # Screenshots (masked — no secrets)
 !images/
 !images/company-creed-all-panes.png
