@@ -4,7 +4,7 @@ postmortem:
   cmd_id: "cmd_211"
   subtask_id: ""
   recorded_by: "karo"
-  severity: "medium"
+  severity: "high"
   category: "info_accuracy"
   tags: ["model_id", "openrouter", "negative_judgment"]
   status: "active"

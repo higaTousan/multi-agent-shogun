@@ -4,7 +4,7 @@ postmortem:
   cmd_id: "cmd_295"
   subtask_id: ""
   recorded_by: "ashigaru1"
-  severity: "low"
+  severity: "medium"
   category: "scope_omission"
   tags: ["scope", "ollama", "zettelkasten"]
   status: "active"
