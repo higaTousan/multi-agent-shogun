@@ -39,6 +39,11 @@ workflow:
   - step: 2
     action: read_yaml
     target: queue/tasks/gunshi.yaml
+  - step: 2.5
+    action: read_active_patterns
+    command: "Read queue/postmortems/ACTIVE_PATTERNS.md"
+    condition: "type == quality_check"
+    note: "QCタスクの場合のみ。ファイル未存在の場合はスキップ（初回のみ）。過去失敗パターンをQC照合に活用せよ"
   - step: 3
     action: update_status
     value: in_progress
@@ -183,6 +188,11 @@ Karo makes final OK/NG decision and unblocks next tasks
 - If task has build → build must complete successfully
 - **If task creates a PR → Vercel Preview deployment must be READY (not ERROR)** ← MANDATORY
 - Scope matches original task YAML description
+- **[ACTIVE_PATTERNS照合]** QC開始時に `queue/postmortems/ACTIVE_PATTERNS.md` を読み込み（step 2.5）、各パターンをタスクに照合せよ:
+  - 各パターンの「確認観点」が今回のタスクに関係するか判定
+  - 関係する場合: 実際に確認し、finding（確認結果）を記載
+  - 無関係の場合: "今回のタスクは対象外" と記載
+  - QCレポートの `postmortem_patterns_checked` に全照合結果を記録すること
 - **[Spec存在チェック]** タスクに対応するSpec文書（docs/specs/ または会議議事録）が存在するか確認:
   - `spec_doc` フィールドが `spec_not_required` 以外の場合 → 当該ファイルが実在するか確認
   - Specが存在しない場合 → 「Specなし実装」として**QC不合格**とする
@@ -319,6 +329,13 @@ result:
   build_status: success  # success | failure | not_applicable
   vercel_preview_status: ready  # ready | error | not_applicable (PR作成時は必須)
   scope_match: complete  # complete | incomplete | exceeded
+  postmortem_patterns_checked:    # ACTIVE_PATTERNS.md照合結果（存在する場合は必須）
+    - pattern: "exit_code=0のみでログ未確認"
+      checked: true
+      finding: "ログ確認済み（出力を目視確認）"
+    - pattern: "モデルID複数バージョン確認"
+      checked: true
+      finding: "今回はAPI調査なし。対象外。"
   skill_candidate_inherited:
     found: false  # Copy from ashigaru report if found: true
 files_modified: ["dashboard.md"]  # Updated dashboard
