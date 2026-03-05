@@ -1,0 +1,57 @@
+postmortem:
+  id: "PM-2026-001"
+  timestamp: "2026-02-19T00:25:00"
+  cmd_id: "cmd_211"
+  subtask_id: ""
+  recorded_by: "karo"
+  severity: "high"
+  category: "info_accuracy"
+  tags: ["model_id", "openrouter", "negative_judgment"]
+  status: "active"
+  resolved_by: "shogun"
+
+  summary: "足軽が旧モデルIDのみ調査し『利用不可』と誤判定し、殿の手動確認で誤りが発覚した。"
+
+  impact: |
+    - 誤ったモデル可用性判定が最終推奨に混入
+    - 殿がOpenRouterを手動確認して是正（約30分の追加対応）
+    - 調査ルール不足により同種ミスが再発し得る状態だった
+
+  trigger: |
+    軍師がネガティブ判定（利用不可）を独自検証せず採用した。
+
+  root_causes:
+    - why1: "足軽1号が旧ID deepseek-v3-0324 の単一確認だけで不可判定した"
+    - why2: "関連モデルIDの全列挙確認ルールが当時の運用で徹底されていなかった"
+    - why3: "ネガティブ判定に対するURL・エラー証跡の必須提出基準が弱かった"
+    - why4: "軍師のクロスチェック工程に『不可判定の独立再検証』が組み込まれていなかった"
+
+  detection: |
+    殿がOpenRouter上の現行ID deepseek/deepseek-v3.2 を直接確認して発見した。
+    エージェント側では自律検知できていなかった。
+
+  resolution: |
+    現行モデルIDを再調査し、deepseek/deepseek-v3.2 が利用可能であることを確認。
+    外部API調査ルールを追記し、ネガティブ判定時の証跡提示要件を明文化した。
+
+  action_items:
+    prevent:
+      - action: "不可・存在しないの判定は、代替手段・別名称を網羅的に調査してから下せ"
+        owner: "karo"
+        status: "TODO"
+    mitigate:
+      - action: "ネガティブ判定（不可・不存在）には必ず検証エビデンスを添付せよ"
+        owner: "gunshi"
+        status: "TODO"
+    process:
+      - action: "重要な判定結果は独立した二重検証を行え"
+        owner: "karo"
+        status: "TODO"
+
+  lessons_learned:
+    well:
+      - "殿の最終確認で誤推奨が本実装へ流入する前に停止できた"
+    wrong:
+      - "単一モデルID確認のみで『利用不可』結論を出した"
+    lucky:
+      - "殿が偶然確認したから発覚。軍師が確認しなければ誤推奨がそのまま実装された"

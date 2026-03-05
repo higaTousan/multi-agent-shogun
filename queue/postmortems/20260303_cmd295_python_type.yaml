@@ -1,0 +1,56 @@
+postmortem:
+  id: "PM-2026-002"
+  timestamp: "2026-03-03T13:10:00"
+  cmd_id: "cmd_295"
+  subtask_id: ""
+  recorded_by: "ashigaru1"
+  severity: "medium"
+  category: "env_mismatch"
+  tags: ["python", "launchd", "version_mismatch"]
+  status: "active"
+  resolved_by: "shogun"
+
+  summary: "Python 3.10+専用型構文をlaunchd（Python 3.9）で使用し実行エラーを起こした。"
+
+  impact: |
+    - 定期処理ジョブが実行時エラーで停止
+    - 原因調査と復旧に追加工数が発生
+    - 実行環境差分チェック不足が再発リスクとして露呈
+
+  trigger: |
+    スクリプト作成時にlaunchd実行環境のPythonバージョン確認を行わなかった。
+
+  root_causes:
+    - why1: "X | None 型構文を3.9環境で実行するコードを投入した"
+    - why2: "preflightで /usr/bin/python3 の実バージョン確認を省略した"
+    - why3: "手動実行環境とlaunchd環境の差分検証を計画に含めていなかった"
+    - why4: "互換性要件（3.9互換）を実装前チェックリストへ固定できていなかった"
+
+  detection: |
+    cmd_295の調査で .periodic_analysis.log の型構文エラーを確認して発覚した。
+
+  resolution: |
+    3.9互換の型記法へ修正し、launchd実行系での構文互換を再確認。
+    preflight項目に実行Python確認を追加する方針を定めた。
+
+  action_items:
+    prevent:
+      - action: "コードは実行環境の制約に合わせよ。開発環境で動くことは本番の保証にならない"
+        owner: "karo"
+        status: "TODO"
+    mitigate:
+      - action: "障害発生時は証拠（ログ・エラー出力）を即座に保全せよ"
+        owner: "ashigaru"
+        status: "TODO"
+    process:
+      - action: "テスト計画には実行環境の前提条件確認を含めよ"
+        owner: "karo"
+        status: "TODO"
+
+  lessons_learned:
+    well:
+      - "ログ調査で環境差異を具体的に特定できた"
+    wrong:
+      - "実行環境確認なしで3.10+記法を投入した"
+    lucky:
+      - "本番運用全面停止前に対象ログを確認でき、早期是正できた"

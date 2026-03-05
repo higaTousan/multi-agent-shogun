@@ -1,0 +1,56 @@
+postmortem:
+  id: "PM-2026-004"
+  timestamp: "2026-03-03T13:30:00"
+  cmd_id: "cmd_295"
+  subtask_id: ""
+  recorded_by: "ashigaru1"
+  severity: "medium"
+  category: "verification_gap"
+  tags: ["launchd", "log_check", "exit_code"]
+  status: "active"
+  resolved_by: "shogun"
+
+  summary: "launchdジョブのexit_code=0のみ確認し、ログ内容のエラー兆候を見逃した。"
+
+  impact: |
+    - 誤った完了報告により問題発見が遅延
+    - 後続調査で追加工数が発生
+    - 検証手順の品質基準不足が露呈
+
+  trigger: |
+    足軽・家老ともに検証手順がexit_code確認のみだった。
+
+  root_causes:
+    - why1: "完了判定基準をexit_code単独に依存した"
+    - why2: "ログ本文確認がテスト手順に組み込まれていなかった"
+    - why3: "レビュー時にログ証跡提出を要求していなかった"
+    - why4: "検証テンプレートがプロセス終了可否中心で、内容確認を欠いていた"
+
+  detection: |
+    cmd_295の調査で .periodic_analysis.log を確認して発覚した。
+
+  resolution: |
+    ログ本文を含む再検証を実施し、判定手順をexit_code+ログ確認へ改定。
+    報告テンプレートにログ抜粋欄を追加する方針を設定した。
+
+  action_items:
+    prevent:
+      - action: "正常終了の判定は、ステータスコードだけでなく出力内容も確認せよ"
+        owner: "karo"
+        status: "TODO"
+    mitigate:
+      - action: "異常の兆候を発見したら、確信がなくても即座に報告せよ"
+        owner: "ashigaru"
+        status: "TODO"
+    process:
+      - action: "完了報告には検証の証跡（ログ・出力結果等）を添付せよ"
+        owner: "gunshi"
+        status: "TODO"
+
+  lessons_learned:
+    well:
+      - "後続調査でログ確認の重要性を定量的に示せた"
+    wrong:
+      - "exit_code=0を完了条件と誤認し、ログ本文を確認しなかった"
+    lucky:
+      - "重大障害化する前に調査が入り、運用停止を回避できた"
