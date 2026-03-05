@@ -94,7 +94,7 @@ render_archive_summary_section() {
 }
 
 render_markdown() {
-  local now total f sev cat summary cmd status marker lesson why1 action
+  local now total f sev cat cmd status marker action origin_note
   now="$(date '+%Y-%m-%dT%H:%M:%S')"
   total="$(wc -l < /tmp/postmortem_candidates_sorted.txt | tr -d ' ')"
 
@@ -105,35 +105,27 @@ render_markdown() {
     [ -f "$f" ] || continue
     sev="$(extract_scalar "severity" "$f" || true)"
     cat="$(extract_scalar "category" "$f" || true)"
-    summary="$(extract_summary "$f" || true)"
     cmd="$(extract_scalar "cmd_id" "$f" || true)"
-    lesson="$(extract_first_lesson_any "$f" || true)"
-    why1="$(extract_why1 "$f" || true)"
     action="$(extract_first_action_item "$f" || true)"
 
     if [ "$status" = "pending_review" ]; then
       marker="⏳"
+      origin_note="殿レビュー待ち"
     else
       marker="✅"
+      origin_note="殿承認済み"
     fi
 
     if [ "$sev" = "critical" ] || [ "$sev" = "high" ]; then
       {
-        echo "### ${marker} [${cat}] ${summary}"
-        echo "- **関連cmd**: ${cmd}"
-        echo "- **ステータス**: ${status}"
-        echo "- **教訓**: ${lesson}"
-        echo "- **NGパターン**: ${why1}"
-        echo "- **主要Action**: ${action}"
+        echo "### ${marker} [${cat}] ${action}"
+        echo "- **由来**: ${cmd} postmortem（${origin_note}）"
         echo ""
       } >> /tmp/postmortem_high.md
     else
       {
-        echo "### ${marker} [${cat}] ${summary}"
-        echo "- **関連cmd**: ${cmd}"
-        echo "- **ステータス**: ${status}"
-        echo "- **教訓**: ${lesson}"
-        echo "- **主要Action**: ${action}"
+        echo "### ${marker} [${cat}] ${action}"
+        echo "- **由来**: ${cmd} postmortem（${origin_note}）"
         echo ""
       } >> /tmp/postmortem_mid_low.md
     fi
@@ -142,7 +134,7 @@ render_markdown() {
   render_archive_summary_section
 
   {
-    echo "# ACTIVE_PATTERNS.md — QC照合チェックリスト"
+    echo "# ACTIVE_PATTERNS.md — QCルール集（承認済みAction Items）"
     echo ""
     echo "**最終更新**: ${now}"
     echo "**表示パターン件数（active + pending_review）**: ${total}件"
