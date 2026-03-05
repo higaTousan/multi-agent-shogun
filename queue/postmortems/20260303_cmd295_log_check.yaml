@@ -7,8 +7,8 @@ postmortem:
   severity: "medium"
   category: "verification_gap"
   tags: ["launchd", "log_check", "exit_code"]
-  status: "pending_review"
-  resolved_by: ""
+  status: "active"
+  resolved_by: "shogun"
 
   summary: "launchdジョブのexit_code=0のみ確認し、ログ内容のエラー兆候を見逃した。"
 

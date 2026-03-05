@@ -7,8 +7,8 @@ postmortem:
   severity: "medium"
   category: "comm_gap"
   tags: ["why", "acceptance_criteria", "task_yaml"]
-  status: "pending_review"
-  resolved_by: ""
+  status: "active"
+  resolved_by: "shogun"
 
   summary: "伝達過程でWHYが消失し、足軽が『ファイル生成』のみを完了条件と誤解した。"
 

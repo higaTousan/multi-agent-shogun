@@ -7,8 +7,8 @@ postmortem:
   severity: "high"
   category: "info_accuracy"
   tags: ["model_id", "openrouter", "negative_judgment"]
-  status: "pending_review"
-  resolved_by: ""
+  status: "active"
+  resolved_by: "shogun"
 
   summary: "足軽が旧モデルIDのみ調査し『利用不可』と誤判定し、殿の手動確認で誤りが発覚した。"
 

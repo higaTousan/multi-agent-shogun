@@ -7,8 +7,8 @@ postmortem:
   severity: "medium"
   category: "env_mismatch"
   tags: ["python", "launchd", "version_mismatch"]
-  status: "pending_review"
-  resolved_by: ""
+  status: "active"
+  resolved_by: "shogun"
 
   summary: "Python 3.10+専用型構文をlaunchd（Python 3.9）で使用し実行エラーを起こした。"
 

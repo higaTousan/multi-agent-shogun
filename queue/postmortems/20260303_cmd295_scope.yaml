@@ -7,8 +7,8 @@ postmortem:
   severity: "medium"
   category: "scope_omission"
   tags: ["scope", "ollama", "zettelkasten"]
-  status: "pending_review"
-  resolved_by: ""
+  status: "active"
+  resolved_by: "shogun"
 
   summary: "weekly/monthly移行時にzettelkastenスクリプトが対象外のまま残存した。"
 
