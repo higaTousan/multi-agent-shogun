@@ -7,24 +7,50 @@ postmortem:
   severity: "medium"
   category: "comm_gap"
   tags: ["why", "acceptance_criteria", "task_yaml"]
-  status: "active"
+  status: "pending_review"
   resolved_by: ""
-  title: "WHYが足軽タスクYAMLに伝わらず、目的不明のまま作業完了"
-  what_happened: |
-    殿→将軍→家老→足軽と指示が伝達される過程で「なぜやるか（WHY）」が消え、
-    「何をやるか（WHAT）」だけ残った。足軽はファイル生成を完了と判断したが、
-    殿が期待した品質比較・目的達成確認は実施されなかった。
-  why_not_detected: |
-    QCでは「成果物が存在するか」のみ判定し、「殿の目的を達成しているか」を検証しなかった。
-    足軽タスクYAMLにparent_cmdのWHYが記載されておらず、判定基準が不明確だった。
+
+  summary: "伝達過程でWHYが消失し、足軽が『ファイル生成』のみを完了条件と誤解した。"
+
+  impact: |
+    - 殿の期待（目的達成確認）と成果物評価が乖離
+    - 追加レビューと手戻りが発生
+    - タスク定義品質が組織的リスクとして顕在化
+
+  trigger: |
+    タスクYAMLのacceptance_criteriaにWHY達成条件が含まれなかった。
+
   root_causes:
-    - why1: "タスクYAMLのacceptance_criteriaが「ファイルが存在すること」のみで目的達成条件がなかった"
-    - why2: "各層の伝達で「目的」が「手順」に変質し、WHYが省略された"
-    - why3: "QC判定基準が「成果物の存在」であり「目的の達成」ではなかった"
-  systemic_improvements:
-    - "足軽タスクYAMLにparent_cmd purposeフィールドを必須化"
-    - "acceptance_criteriaにWHY達成条件を必ず含める（ファイル存在のみ不可）"
-    - "QC判定を「殿の目的を達成しているか」ベースに変更"
-  lessons:
-    - "QC開始時にタスクYAMLのacceptance_criteriaとparent_cmd purposeを照合せよ"
-    - "acceptance_criteriaが『ファイルが存在すること』のみなら、WHYが消失している証拠"
+    - why1: "acceptance_criteriaが成果物存在のみで、目的達成の検証条件を欠いていた"
+    - why2: "殿→将軍→家老→足軽の伝達でWHYが段階的に省略された"
+    - why3: "QCが『成果物の有無』中心で『目的達成』を判定していなかった"
+    - why4: "parent_cmd purposeの照合手順が標準プロセスとして固定化されていなかった"
+
+  detection: |
+    殿が成果物を確認した際に、期待した目的と一致しないことを発見した。
+
+  resolution: |
+    タスク記述ルールを見直し、purpose連携とWHY達成条件を明示する運用へ移行。
+    QCでpurpose照合を必須化する方針を設定した。
+
+  action_items:
+    prevent:
+      - action: "足軽タスクYAMLに parent_cmd purpose の明記を必須化"
+        owner: "karo"
+        status: "TODO"
+    mitigate:
+      - action: "目的不明確タスクは着手前にinboxで照会する運用を徹底"
+        owner: "ashigaru"
+        status: "TODO"
+    process:
+      - action: "QCチェック項目に『WHY達成条件の存在確認』を追加"
+        owner: "gunshi"
+        status: "TODO"
+
+  lessons_learned:
+    well:
+      - "殿レビューで期待との乖離を早期に止められた"
+    wrong:
+      - "WHATのみでタスクを定義し、WHYを検証条件に落とし込めなかった"
+    lucky:
+      - "最終納品前に殿が確認したため、誤方向のまま固定化を回避できた"

@@ -7,21 +7,50 @@ postmortem:
   severity: "medium"
   category: "verification_gap"
   tags: ["launchd", "log_check", "exit_code"]
-  status: "active"
+  status: "pending_review"
   resolved_by: ""
-  title: "launchdジョブのexit_code=0のみ確認でログ内容未チェック"
-  what_happened: |
-    launchdジョブの成否確認で exit_code=0 のみを見て完了扱いにした。
-    実際にはログに異常兆候が含まれていたが、内容確認を行わず誤報告につながった。
-  why_not_detected: |
-    検証手順がプロセス終了コード中心で、ログ本文確認の必須ステップが無かった。
-    レビュー側もログ抜粋提示を要求していなかった。
+
+  summary: "launchdジョブのexit_code=0のみ確認し、ログ内容のエラー兆候を見逃した。"
+
+  impact: |
+    - 誤った完了報告により問題発見が遅延
+    - 後続調査で追加工数が発生
+    - 検証手順の品質基準不足が露呈
+
+  trigger: |
+    足軽・家老ともに検証手順がexit_code確認のみだった。
+
   root_causes:
-    - why1: "完了判定をexit_code単独に依存した"
-    - why2: "ログ本文確認をチェックリストに定義していなかった"
-    - why3: "報告テンプレートにログ証跡欄が無かった"
-  systemic_improvements:
-    - "launchd検証テンプレートに『ログ先頭/末尾20行』添付を必須化"
-    - "exit_code=0 のみで完了判定不可ルールを明文化"
-  lessons:
-    - "exit_code=0は『プロセスが死ななかった』だけ。ログ内容も必ず確認せよ"
+    - why1: "完了判定基準をexit_code単独に依存した"
+    - why2: "ログ本文確認がテスト手順に組み込まれていなかった"
+    - why3: "レビュー時にログ証跡提出を要求していなかった"
+    - why4: "検証テンプレートがプロセス終了可否中心で、内容確認を欠いていた"
+
+  detection: |
+    cmd_295の調査で .periodic_analysis.log を確認して発覚した。
+
+  resolution: |
+    ログ本文を含む再検証を実施し、判定手順をexit_code+ログ確認へ改定。
+    報告テンプレートにログ抜粋欄を追加する方針を設定した。
+
+  action_items:
+    prevent:
+      - action: "launchd検証は exit_code とログ本文（先頭/末尾20行）を必須化"
+        owner: "karo"
+        status: "TODO"
+    mitigate:
+      - action: "異常兆候検知時に即時inbox報告するエスカレーション手順を定義"
+        owner: "ashigaru"
+        status: "TODO"
+    process:
+      - action: "QCチェックリストへ『ログ証跡添付』項目を追加"
+        owner: "gunshi"
+        status: "TODO"
+
+  lessons_learned:
+    well:
+      - "後続調査でログ確認の重要性を定量的に示せた"
+    wrong:
+      - "exit_code=0を完了条件と誤認し、ログ本文を確認しなかった"
+    lucky:
+      - "重大障害化する前に調査が入り、運用停止を回避できた"

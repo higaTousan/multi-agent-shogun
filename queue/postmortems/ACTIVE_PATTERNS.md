@@ -1,34 +1,44 @@
 # ACTIVE_PATTERNS.md — QC照合チェックリスト
 
-**最終更新**: 2026-03-04T20:15:27
-**有効パターン件数**: 5件
+**最終更新**: 2026-03-05T11:05:17
+**表示パターン件数（active + pending_review）**: 5件
 
 ## ⚠️ 高優先度パターン（high/critical）
 
-### [info_accuracy] DeepSeek V3.2 モデルID誤判定（1つのIDで利用不可と結論）
+### ⏳ [info_accuracy] 足軽が旧モデルIDのみ調査し『利用不可』と誤判定し、殿の手動確認で誤りが発覚した。
 - **関連cmd**: cmd_211
-- **確認観点**: 『利用不可』は最も誤りやすい判定。バージョン違い・別名を必ず確認せよ
-- **NGパターン**: 単一のモデルIDのみ調査して「不可」と結論した
+- **ステータス**: pending_review
+- **教訓**: 殿の最終確認で誤推奨が本実装へ流入する前に停止できた
+- **NGパターン**: 足軽1号が旧ID deepseek-v3-0324 の単一確認だけで不可判定した
+- **主要Action**: 外部API調査時は関連モデルIDを全列挙し、単一IDで不可判定しないチェックを必須化
 
-## ⚡ 中優先度パターン（medium）
+## ⚡ 中低優先度パターン（medium/low）
 
-### [comm_gap] WHYが足軽タスクYAMLに伝わらず、目的不明のまま作業完了
+### ⏳ [comm_gap] 伝達過程でWHYが消失し、足軽が『ファイル生成』のみを完了条件と誤解した。
 - **関連cmd**: cmd_268
-- **確認観点**: QC開始時にタスクYAMLのacceptance_criteriaとparent_cmd purposeを照合せよ
-- **チェック**: 足軽タスクYAMLにparent_cmd purposeフィールドを必須化
+- **ステータス**: pending_review
+- **教訓**: 殿レビューで期待との乖離を早期に止められた
+- **主要Action**: 足軽タスクYAMLに parent_cmd purpose の明記を必須化
 
-### [env_mismatch] Python 3.10+型構文をlaunchd（Python 3.9）で使用
+### ⏳ [env_mismatch] Python 3.10+専用型構文をlaunchd（Python 3.9）で使用し実行エラーを起こした。
 - **関連cmd**: cmd_295
-- **確認観点**: launchd実行系は /usr/bin/python3 = 3.9.6。X|None禁止、Optional[X]を使え
-- **チェック**: launchd系Pythonスクリプトは Optional[X] を必須とするlintルールを追加
+- **ステータス**: pending_review
+- **教訓**: ログ調査で環境差異を具体的に特定できた
+- **主要Action**: launchd対象Pythonは3.9互換記法（Optional/Union）を標準化
 
-### [scope_omission] weekly/monthly/yearly Gemini移行時にzettelkastenが対象外
+### ⏳ [scope_omission] weekly/monthly移行時にzettelkastenスクリプトが対象外のまま残存した。
 - **関連cmd**: cmd_295
-- **確認観点**: モデル移行時は全スクリプト横断でgrep確認せよ
-- **チェック**: モデル移行タスクに 'rg -n model_id scripts/' の実行証跡を必須化
+- **ステータス**: pending_review
+- **教訓**: 調査フェーズで漏れを特定し、再修正の起点を作れた
+- **主要Action**: モデル移行タスクは rg による対象ファイル全列挙を必須化
 
-### [verification_gap] launchdジョブのexit_code=0のみ確認でログ内容未チェック
+### ⏳ [verification_gap] launchdジョブのexit_code=0のみ確認し、ログ内容のエラー兆候を見逃した。
 - **関連cmd**: cmd_295
-- **確認観点**: exit_code=0は『プロセスが死ななかった』だけ。ログ内容も必ず確認せよ
-- **チェック**: launchd検証テンプレートに『ログ先頭/末尾20行』添付を必須化
+- **ステータス**: pending_review
+- **教訓**: 後続調査でログ確認の重要性を定量的に示せた
+- **主要Action**: launchd検証は exit_code とログ本文（先頭/末尾20行）を必須化
 
+## 📚 アーカイブ済み教訓サマリー
+| カテゴリ | 教訓1行サマリー | 関連cmd | archive日 |
+|---------|----------------|---------|---------|
+| - | （アーカイブなし） | - | - |

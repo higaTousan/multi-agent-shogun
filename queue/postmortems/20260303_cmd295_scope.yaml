@@ -7,21 +7,50 @@ postmortem:
   severity: "medium"
   category: "scope_omission"
   tags: ["scope", "ollama", "zettelkasten"]
-  status: "active"
+  status: "pending_review"
   resolved_by: ""
-  title: "weekly/monthly/yearly Gemini移行時にzettelkastenが対象外"
-  what_happened: |
-    定期分析スクリプトのGemini移行時に、類似構造の zettelkasten パイプラインが移行対象から漏れた。
-    一部ジョブのみ旧経路のままとなり、運用整合性が崩れた。
-  why_not_detected: |
-    変更対象の網羅確認をファイル横断で実施せず、対象リストが担当者の記憶依存だった。
-    完了判定で「同名処理群の横断チェック」が無かった。
+
+  summary: "weekly/monthly移行時にzettelkastenスクリプトが対象外のまま残存した。"
+
+  impact: |
+    - 同系列ジョブで実装経路が不統一化
+    - 追加調査と再修正が必要になった
+    - 変更対象網羅確認プロセスの欠陥が可視化された
+
+  trigger: |
+    タスク指示にzettelkastenが明示されなかった。
+
   root_causes:
-    - why1: "移行対象一覧を機械的に抽出せず手作業で判断した"
-    - why2: "同系列スクリプトのgrep横断チェックを省略した"
-    - why3: "完了条件に『関連スクリプト全件確認』が含まれていなかった"
-  systemic_improvements:
-    - "モデル移行タスクに 'rg -n model_id scripts/' の実行証跡を必須化"
-    - "完了報告テンプレートに『対象外ファイルと理由』欄を追加"
-  lessons:
-    - "モデル移行時は全スクリプト横断でgrep確認せよ"
+    - why1: "移行対象を手作業判断し、同系列スクリプトの網羅抽出をしなかった"
+    - why2: "task定義に対象外ファイル確認の要求が含まれていなかった"
+    - why3: "完了判定で横断grep証跡の提出を求めていなかった"
+    - why4: "影響範囲チェックを標準プロセスに固定していなかった"
+
+  detection: |
+    cmd_295の調査で、関連スクリプト比較時に漏れが判明した。
+
+  resolution: |
+    対象スクリプト一覧を再確認し、漏れた経路を移行対象へ組み入れた。
+    今後は横断抽出コマンドを証跡として提出する運用に変更する。
+
+  action_items:
+    prevent:
+      - action: "モデル移行タスクは rg による対象ファイル全列挙を必須化"
+        owner: "karo"
+        status: "TODO"
+    mitigate:
+      - action: "対象外ファイルがある場合は理由を完了報告に明記する"
+        owner: "ashigaru"
+        status: "TODO"
+    process:
+      - action: "QCで『同系列スクリプト全件確認済み』チェックを追加"
+        owner: "gunshi"
+        status: "TODO"
+
+  lessons_learned:
+    well:
+      - "調査フェーズで漏れを特定し、再修正の起点を作れた"
+    wrong:
+      - "影響範囲を機械抽出せず記憶ベースで判断した"
+    lucky:
+      - "早期調査で見つかったため、長期的な運用不整合を回避できた"
