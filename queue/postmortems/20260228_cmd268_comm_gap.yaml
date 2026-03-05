@@ -35,15 +35,15 @@ postmortem:
 
   action_items:
     prevent:
-      - action: "足軽タスクYAMLに parent_cmd purpose の明記を必須化"
+      - action: "作業指示には必ず目的（WHY）を含めよ。WHATだけの指示は禁止"
         owner: "karo"
         status: "TODO"
     mitigate:
-      - action: "目的不明確タスクは着手前にinboxで照会する運用を徹底"
+      - action: "目的が不明確な指示を受けたら、着手前に確認せよ"
         owner: "ashigaru"
         status: "TODO"
     process:
-      - action: "QCチェック項目に『WHY達成条件の存在確認』を追加"
+      - action: "成果物の検証は、作業完了ではなく目的達成で判定せよ"
         owner: "gunshi"
         status: "TODO"
 

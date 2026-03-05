@@ -1,25 +1,25 @@
 # ACTIVE_PATTERNS.md — QCルール集（承認済みAction Items）
 
-**最終更新**: 2026-03-05T11:09:09
+**最終更新**: 2026-03-05T11:20:07
 **表示パターン件数（active + pending_review）**: 5件
 
 ## ⚠️ 高優先度パターン（high/critical）
 
-### ⏳ [info_accuracy] 外部API調査時は関連モデルIDを全列挙し、単一IDで不可判定しないチェックを必須化
+### ⏳ [info_accuracy] 不可・存在しないの判定は、代替手段・別名称を網羅的に調査してから下せ
 - **由来**: cmd_211 postmortem（殿レビュー待ち）
 
 ## ⚡ 中低優先度パターン（medium/low）
 
-### ⏳ [comm_gap] 足軽タスクYAMLに parent_cmd purpose の明記を必須化
+### ⏳ [comm_gap] 作業指示には必ず目的（WHY）を含めよ。WHATだけの指示は禁止
 - **由来**: cmd_268 postmortem（殿レビュー待ち）
 
-### ⏳ [env_mismatch] launchd対象Pythonは3.9互換記法（Optional/Union）を標準化
+### ⏳ [env_mismatch] コードは実行環境の制約に合わせよ。開発環境で動くことは本番の保証にならない
 - **由来**: cmd_295 postmortem（殿レビュー待ち）
 
-### ⏳ [scope_omission] モデル移行タスクは rg による対象ファイル全列挙を必須化
+### ⏳ [scope_omission] 変更の影響範囲は、既知のファイルだけでなくgrep等で機械的に全件洗い出せ
 - **由来**: cmd_295 postmortem（殿レビュー待ち）
 
-### ⏳ [verification_gap] launchd検証は exit_code とログ本文（先頭/末尾20行）を必須化
+### ⏳ [verification_gap] 正常終了の判定は、ステータスコードだけでなく出力内容も確認せよ
 - **由来**: cmd_295 postmortem（殿レビュー待ち）
 
 ## 📚 アーカイブ済み教訓サマリー

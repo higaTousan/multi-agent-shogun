@@ -35,15 +35,15 @@ postmortem:
 
   action_items:
     prevent:
-      - action: "launchd対象Pythonは3.9互換記法（Optional/Union）を標準化"
+      - action: "コードは実行環境の制約に合わせよ。開発環境で動くことは本番の保証にならない"
         owner: "karo"
         status: "TODO"
     mitigate:
-      - action: "定期ジョブ失敗時はログ先頭/末尾20行を即時収集する運用を導入"
+      - action: "障害発生時は証拠（ログ・エラー出力）を即座に保全せよ"
         owner: "ashigaru"
         status: "TODO"
     process:
-      - action: "テスト計画レビューで『実行環境バージョン確認』を必須チェック化"
+      - action: "テスト計画には実行環境の前提条件確認を含めよ"
         owner: "karo"
         status: "TODO"
 

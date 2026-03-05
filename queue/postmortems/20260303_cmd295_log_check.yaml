@@ -35,15 +35,15 @@ postmortem:
 
   action_items:
     prevent:
-      - action: "launchd検証は exit_code とログ本文（先頭/末尾20行）を必須化"
+      - action: "正常終了の判定は、ステータスコードだけでなく出力内容も確認せよ"
         owner: "karo"
         status: "TODO"
     mitigate:
-      - action: "異常兆候検知時に即時inbox報告するエスカレーション手順を定義"
+      - action: "異常の兆候を発見したら、確信がなくても即座に報告せよ"
         owner: "ashigaru"
         status: "TODO"
     process:
-      - action: "QCチェックリストへ『ログ証跡添付』項目を追加"
+      - action: "完了報告には検証の証跡（ログ・出力結果等）を添付せよ"
         owner: "gunshi"
         status: "TODO"
 

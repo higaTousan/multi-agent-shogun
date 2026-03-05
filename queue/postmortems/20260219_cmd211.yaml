@@ -36,15 +36,15 @@ postmortem:
 
   action_items:
     prevent:
-      - action: "外部API調査時は関連モデルIDを全列挙し、単一IDで不可判定しないチェックを必須化"
+      - action: "不可・存在しないの判定は、代替手段・別名称を網羅的に調査してから下せ"
         owner: "karo"
         status: "TODO"
     mitigate:
-      - action: "『利用不可』報告には試行URL・モデルID・エラー本文を添付し、欠落時は差し戻す"
+      - action: "ネガティブ判定（不可・不存在）には必ず検証エビデンスを添付せよ"
         owner: "gunshi"
         status: "TODO"
     process:
-      - action: "軍師QCにネガティブ判定の独立再検証ステップを追加"
+      - action: "重要な判定結果は独立した二重検証を行え"
         owner: "karo"
         status: "TODO"
 
