@@ -345,6 +345,54 @@ get_agent_model() {
     esac
 }
 
+# get_model_display_name(agent_id)
+# pane-border-format 用の短い表示名を返す
+# Format: "{ShortName}" or "{ShortName}+T" (thinking enabled)
+# Examples: Sonnet, Opus+T, Haiku, Codex, Spark
+get_model_display_name() {
+    local agent_id="$1"
+    local model
+    model=$(get_agent_model "$agent_id")
+    local cli_type
+    cli_type=$(get_cli_type "$agent_id")
+    local thinking
+    thinking=$(_cli_adapter_read_yaml "cli.agents.${agent_id}.thinking" "")
+
+    # モデル名 → 短縮表示名
+    local short=""
+    case "$model" in
+        *spark*)                short="Spark" ;;
+        gpt-5.3-codex)          short="Codex5.3" ;;
+        *codex*|gpt-5.3)        short="Codex" ;;
+        *opus*)                 short="Opus" ;;
+        *sonnet*)               short="Sonnet" ;;
+        *haiku*)                short="Haiku" ;;
+        *k2.5*|*kimi*)          short="Kimi" ;;
+        *)
+            # CLI種別から推測
+            case "$cli_type" in
+                codex)   short="Codex" ;;
+                copilot) short="Copilot" ;;
+                kimi)    short="Kimi" ;;
+                *)       short="$model" ;;
+            esac
+            ;;
+    esac
+
+    # Thinking表示: Claude系はデフォルトONなので、falseの時だけ非表示
+    # Claude: thinking: false → なし, それ以外(true/未設定) → "+T"
+    # Codex等: Thinkingなし → 常になし
+    if [[ "$cli_type" == "claude" ]]; then
+        if [[ "$thinking" == "false" || "$thinking" == "False" ]]; then
+            echo "$short"
+        else
+            echo "${short}+T"
+        fi
+    else
+        echo "$short"
+    fi
+}
+
 # get_startup_prompt(agent_id)
 # CLIが初回起動時に自動実行すべき初期プロンプトを返す
 # Codex CLI: [PROMPT]引数として渡す（サジェストUI停止問題の根本対策）
