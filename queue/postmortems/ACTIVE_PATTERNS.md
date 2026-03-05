@@ -1,34 +1,28 @@
-# ACTIVE_PATTERNS.md — QC照合チェックリスト
+# ACTIVE_PATTERNS.md — QCルール集（承認済みAction Items）
 
-**最終更新**: 2026-03-04T20:15:27
-**有効パターン件数**: 5件
+**最終更新**: 2026-03-05T11:20:07
+**表示パターン件数（active + pending_review）**: 5件
 
 ## ⚠️ 高優先度パターン（high/critical）
 
-### [info_accuracy] DeepSeek V3.2 モデルID誤判定（1つのIDで利用不可と結論）
-- **関連cmd**: cmd_211
-- **確認観点**: 『利用不可』は最も誤りやすい判定。バージョン違い・別名を必ず確認せよ
-- **NGパターン**: 単一のモデルIDのみ調査して「不可」と結論した
+### ⏳ [info_accuracy] 不可・存在しないの判定は、代替手段・別名称を網羅的に調査してから下せ
+- **由来**: cmd_211 postmortem（殿レビュー待ち）
 
-## ⚡ 中優先度パターン（medium）
+## ⚡ 中低優先度パターン（medium/low）
 
-### [comm_gap] WHYが足軽タスクYAMLに伝わらず、目的不明のまま作業完了
-- **関連cmd**: cmd_268
-- **確認観点**: QC開始時にタスクYAMLのacceptance_criteriaとparent_cmd purposeを照合せよ
-- **チェック**: 足軽タスクYAMLにparent_cmd purposeフィールドを必須化
+### ⏳ [comm_gap] 作業指示には必ず目的（WHY）を含めよ。WHATだけの指示は禁止
+- **由来**: cmd_268 postmortem（殿レビュー待ち）
 
-### [env_mismatch] Python 3.10+型構文をlaunchd（Python 3.9）で使用
-- **関連cmd**: cmd_295
-- **確認観点**: launchd実行系は /usr/bin/python3 = 3.9.6。X|None禁止、Optional[X]を使え
-- **チェック**: launchd系Pythonスクリプトは Optional[X] を必須とするlintルールを追加
+### ⏳ [env_mismatch] コードは実行環境の制約に合わせよ。開発環境で動くことは本番の保証にならない
+- **由来**: cmd_295 postmortem（殿レビュー待ち）
 
-### [scope_omission] weekly/monthly/yearly Gemini移行時にzettelkastenが対象外
-- **関連cmd**: cmd_295
-- **確認観点**: モデル移行時は全スクリプト横断でgrep確認せよ
-- **チェック**: モデル移行タスクに 'rg -n model_id scripts/' の実行証跡を必須化
+### ⏳ [scope_omission] 変更の影響範囲は、既知のファイルだけでなくgrep等で機械的に全件洗い出せ
+- **由来**: cmd_295 postmortem（殿レビュー待ち）
 
-### [verification_gap] launchdジョブのexit_code=0のみ確認でログ内容未チェック
-- **関連cmd**: cmd_295
-- **確認観点**: exit_code=0は『プロセスが死ななかった』だけ。ログ内容も必ず確認せよ
-- **チェック**: launchd検証テンプレートに『ログ先頭/末尾20行』添付を必須化
+### ⏳ [verification_gap] 正常終了の判定は、ステータスコードだけでなく出力内容も確認せよ
+- **由来**: cmd_295 postmortem（殿レビュー待ち）
 
+## 📚 アーカイブ済み教訓サマリー
+| カテゴリ | 教訓1行サマリー | 関連cmd | archive日 |
+|---------|----------------|---------|---------|
+| - | （アーカイブなし） | - | - |
