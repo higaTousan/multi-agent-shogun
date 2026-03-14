@@ -303,8 +303,14 @@ Before assigning tasks, ask yourself these five questions:
 | 壱 | **Purpose** | Read cmd's `purpose` and `acceptance_criteria`. These are the contract. Every subtask must trace back to at least one criterion. |
 | 弐 | **Decomposition** | How to split for maximum efficiency? Parallel possible? Dependencies? |
 | 参 | **Headcount** | How many ashigaru? Split across as many as possible. Don't be lazy. |
-| 四 | **Perspective** | What persona/scenario is effective? What expertise needed? |
+| 四 | **Perspective & End User** | 誰が最終的にこの成果物を見るか（end_user）？その人間の視点で違和感がないか？What expertise needed? |
 | 伍 | **Risk** | RACE-001 risk? Ashigaru availability? Dependency ordering? |
+
+**End User Clarity Rule（殿の直命 cmd_315）:**
+subtask YAMLを書く際、`end_user` と `user_perspective_check` を必ず含めよ。
+- `end_user`: この成果物を最終的に見る人間は誰か（例: 七宝数秘の顧客、殿、社内エンジニア）
+- `user_perspective_check`: その人間が見たとき違和感がないことの確認条件
+WHYを直接伝えなくても「誰が見るか」がわかれば足軽は自ずとユーザー視点で確認できる。
 
 **Do**: Read `purpose` + `acceptance_criteria` → design execution to satisfy ALL criteria.
 **Don't**: Forward shogun's instruction verbatim. That's karo's disgrace (家老の名折れ).
@@ -342,6 +348,8 @@ task:
   bloom_level: L3        # L1-L3=Ashigaru, L4-L6=Gunshi
   description: "Create hello1.md with content 'おはよう1'"
   target_path: "/mnt/c/tools/multi-agent-shogun/hello1.md"
+  end_user: "殿（内部確認用）"
+  user_perspective_check: "殿が見て違和感がないか"
   echo_message: "🔥 足軽1号、先陣を切って参る！八刃一志！"
   status: assigned
   timestamp: "2026-01-25T12:00:00"
@@ -499,7 +507,7 @@ Push notifications to the lord's phone via ntfy. Karo manages streaks and notifi
 1. Get `parent_cmd` of completed subtask
 2. Check all subtasks with same `parent_cmd`: `grep -l "parent_cmd: cmd_XXX" queue/tasks/ashigaru*.yaml | xargs grep "status:"`
 3. Not all done → skip notification
-4. All done → **purpose validation**: Re-read the original cmd in `queue/shogun_to_karo.yaml`. Compare the cmd's stated purpose against the combined deliverables. If purpose is not achieved (subtasks completed but goal unmet), do NOT mark cmd as done — instead create additional subtasks or report the gap to shogun via dashboard 🚨.
+4. All done → **purpose validation**: Re-read the original cmd in `queue/shogun_to_karo.yaml`. Compare the cmd's stated purpose against the combined deliverables. Additionally verify: **「成果物を最終的に見る人間の立場で確認したか」** — 技術的完了（tsc/test/PR）だけでdoneにしない。`user_perspective_check`の条件を満たしているか確認すること。If purpose is not achieved or user_perspective_check fails, do NOT mark cmd as done — instead create additional subtasks or report the gap to shogun via dashboard 🚨.
 5. Purpose validated → update `saytask/streaks.yaml`:
    - `today.completed` += 1 (**per cmd**, not per subtask)
    - Streak logic: last_date=today → keep current; last_date=yesterday → current+1; else → reset to 1
