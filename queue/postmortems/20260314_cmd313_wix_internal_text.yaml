@@ -1,0 +1,63 @@
+postmortem:
+  id: "PM-2026-006"
+  timestamp: "2026-03-14T12:49:52+09:00"
+  cmd_id: "cmd_313"
+  subtask_id: "subtask_313b"
+  recorded_by: "ashigaru1"
+  severity: "high"
+  category: "content_qc_gap"
+  tags: ["wix", "content-review", "placeholder", "qc"]
+  status: "active"
+  resolved_by: "shogun"
+
+  summary: "WIX移行時の内部メモ10件が本番サイトのユーザー向けテキストとして露出した。"
+
+  impact: |
+    - 本番ユーザーに開発者向け内部メモが表示された
+    - サイト品質と信頼性を損なうリスクが生じた
+    - 3/20ロンチ前の緊急確認と手戻り対応が発生した（10ファイル対象）
+
+  trigger: |
+    app/menu/page.tsx・app/profile/episodes/page.tsx・app/menu/cancel-policy/page.tsx・
+    app/profile/page.tsx・app/event/page.tsx・app/counselor/page.tsx・
+    app/menu/petit/page.tsx・app/menu/100-year/page.tsx・
+    app/menu/online-group/page.tsx・app/menu/courses/page.tsx（計10ファイル）に、
+    WIX移行時の内部メモがユーザー向け文言として残存していた。
+
+  root_causes:
+    - why1: "足軽がWIX模写実装時にテキストを仮テキストとして残した"
+    - why2: "仮テキストや移行メモを正式文言へ差し替える完了条件が作業手順に固定されていなかった"
+    - why3: "軍師QCがコード構造・型チェック・テスト中心で、ユーザー向けテキスト内容の精査が不十分だった"
+    - why4: "内部用語・TODO・プレースホルダー残存を検知するQC観点がACTIVE_PATTERNSに未登録だった"
+
+  detection: |
+    殿が本番サイトを目視確認した際に、WIX移行時の内部メモ露出を発見した。
+
+  resolution: |
+    cmd_313で露出文言3件を正式なユーザー向け文面へ修正し、
+    再発防止としてQCチェックリストにテキスト内容確認観点を追加する。
+
+  action_items:
+    prevent:
+      - action: "ユーザー向けページのテキストに開発者向け内部文言（「WIX」「移植」「仮テキスト」「TODO」「プレースホルダー」等）が残っていないか確認すること"
+        owner: "gunshi"
+        status: "done"
+        implementation: "ACTIVE_PATTERNS.md 原則1『最終的に見る人間の立場で確認せよ』に組み込み。実践例として明記。instructions/ashigaru.mdの品質ルール追加と連動。"
+    mitigate:
+      - action: "仮テキストを使用した場合は、正式文言未確定であることをタスクとレポートに明記すること"
+        owner: "ashigaru"
+        status: "done"
+        implementation: "instructions/ashigaru.md に『Final Deliverable Review Principle』を追加。ユーザー視点でのテキスト確認を手順化。"
+    process:
+      - action: "ユーザー表示テキストのレビューをQC手順へ組み込み、内容確認の証跡を残すこと"
+        owner: "karo"
+        status: "done"
+        implementation: "ACTIVE_PATTERNS.md に3つの抽象原則を定義。原則1がユーザー向けテキスト確認を標準化。全軍師・足軽がこれに従う。"
+
+  lessons_learned:
+    well:
+      - "3/20ロンチ前に殿の目視で発見できたため、本格公開前に是正へ移れた"
+    wrong:
+      - "内部メモを仮テキストのまま残し、QCでも内容確認を見落とした"
+    lucky:
+      - "露出箇所が限定的で、ポストモーテムとルール更新に即座につなげられた"

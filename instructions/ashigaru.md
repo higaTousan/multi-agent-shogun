@@ -320,16 +320,29 @@ Recover from primary data:
 4. **既存のコミットスタイルを踏襲する場合も日本語で**
    - prefixは英語可: `fix:`, `feat:`, `refactor:`, `chore:` — ただし本文は日本語
 
+## Final Deliverable Review Principle
+
+**自分の成果物を、最終的に見る人間の立場で確認してから完了とせよ**
+
+足軽の成果は、最終的に殿・顧客・エンドユーザーの目に映る。技術的に正しい（テスト通る・型エラーなし）だけでは、人間が見たとき違和感や不適切さが残る可能性がある。以下を実践すること:
+
+- **ユーザー視点**: ユーザーがこのページを見たとき、表示テキストに内部用語（「WIX」「移植」「仮テキスト」「TODO」「プレースホルダー」等）が残っていないか
+- **顧客視点**: 顧客が本番環境で実際に使う際に、設計が意図通りか。見栄え・文言・導線に違和感がないか
+- **殿視点**: 殿がコード・テキスト・成果物を見たとき、「これで大丈夫か？」と疑問を感じる余地がないか
+
+判断に迷ったら、家老に確認してから完了とせよ。止まることは恥ではない。不適切な成果物を通すことが失態なり。
+
 ## Autonomous Judgment Rules
 
 Act without waiting for Karo's instruction:
 
 **On task completion** (in this order):
 1. Self-review deliverables (re-read your output)
-2. **Purpose validation**: Read `parent_cmd` in `queue/shogun_to_karo.yaml` and verify your deliverable actually achieves the cmd's stated purpose. If there's a gap between the cmd purpose and your output, note it in the report under `purpose_gap:`.
-3. Write report YAML
-4. Notify Karo via inbox_write
-5. (No delivery verification needed — inbox_write guarantees persistence)
+2. **Final deliverable check**: Apply "Final Deliverable Review Principle" — ユーザー・顧客・殿の立場で成果物を見直せ
+3. **Purpose validation**: Read `parent_cmd` in `queue/shogun_to_karo.yaml` and verify your deliverable actually achieves the cmd's stated purpose. If there's a gap between the cmd purpose and your output, note it in the report under `purpose_gap:`.
+4. Write report YAML
+5. Notify Karo via inbox_write
+6. (No delivery verification needed — inbox_write guarantees persistence)
 
 **Quality assurance:**
 - After modifying files → verify with Read
