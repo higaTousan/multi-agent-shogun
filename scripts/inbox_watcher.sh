@@ -278,6 +278,9 @@ normalize_special_command() {
                 echo "[$(date)] [SKIP] Invalid model_switch payload for $AGENT_ID: ${raw_content:-<empty>}" >&2
             fi
             ;;
+        connection_switch)
+            echo "__CONNECTION_SWITCH__:${raw_content}"
+            ;;
         cli_restart)
             # cli_restart is handled externally by switch_cli.sh, not via send_cli_command.
             # Emit a marker so the main loop can call switch_cli.sh.
@@ -411,7 +414,7 @@ try:
 
     messages = data.get("messages", []) or []
     unread = [m for m in messages if not m.get("read", False)]
-    special_types = ("clear_command", "model_switch", "cli_restart")
+    special_types = ("clear_command", "model_switch", "connection_switch", "cli_restart")
     specials = [m for m in unread if m.get("type") in special_types]
 
     if specials:
@@ -670,6 +673,38 @@ send_context_reset() {
     if agent_is_busy; then
         echo "[$(date)] [CONTEXT-RESET] $AGENT_ID still busy after 15s — proceeding anyway" >&2
     fi
+}
+
+# ─── Send connection switch command ───
+# Cross-cost-group switches need a full CLI relaunch so the new env vars apply.
+# Production delegates to switch_cli.sh; test mode falls back to a lightweight
+# /clear + launch command sequence so unit tests can validate the send-keys path.
+send_connection_switch() {
+    local target_model="${1:-}"
+    [ -n "$target_model" ] || return 0
+
+    # Prefer the dedicated restart path in normal runtime.
+    if [ "${__INBOX_WATCHER_TESTING__:-0}" != "1" ] && [ -x "${SCRIPT_DIR}/scripts/switch_cli.sh" ]; then
+        echo "[$(date)] [CONNECTION-SWITCH] Delegating to switch_cli.sh for $AGENT_ID → ${target_model}" >&2
+        bash "${SCRIPT_DIR}/scripts/switch_cli.sh" "$AGENT_ID" --model "$target_model" 2>&1 | while IFS= read -r line; do
+            echo "[$(date)] [switch_cli] $line" >&2
+        done
+        return 0
+    fi
+
+    local launch_cmd=""
+    if type build_cli_command_with_model &>/dev/null; then
+        launch_cmd=$(build_cli_command_with_model "$AGENT_ID" "$target_model" 2>/dev/null || true)
+    fi
+    if [ -z "$launch_cmd" ]; then
+        launch_cmd="claude --model ${target_model} --dangerously-skip-permissions"
+    fi
+
+    echo "[$(date)] [CONNECTION-SWITCH] Fallback relaunch for $AGENT_ID → ${target_model}" >&2
+    send_cli_command "/clear"
+    timeout 5 tmux send-keys -t "$PANE_TARGET" "$launch_cmd" 2>/dev/null || true
+    sleep 0.3
+    timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null || true
 }
 
 # ─── Agent self-watch detection ───
@@ -974,6 +1009,10 @@ for s in data.get('specials', []):
                     echo "[$(date)] [SKIP] Agent $AGENT_ID is busy — /clear (clear_command) deferred to next cycle" >&2
                     continue
                 fi
+            fi
+            if [ "$msg_type" = "connection_switch" ]; then
+                send_connection_switch "$msg_content"
+                continue
             fi
             cmd=$(normalize_special_command "$msg_type" "$msg_content")
             if [ -n "$cmd" ]; then
