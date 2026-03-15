@@ -188,6 +188,9 @@ Karo makes final OK/NG decision and unblocks next tasks
 - If task has build → build must complete successfully
 - **If task creates a PR → Vercel Preview deployment must be READY (not ERROR)** ← MANDATORY
 - Scope matches original task YAML description
+- **[ /qc 必須 ]** QCタスク（`type: qc` または gunshi_qc系タスク）を開始する際は、必ず `/qc` スキルを起動してから判定に入ること
+  - gunshi_qcタスクで PASS / FAIL / CONDITIONAL PASS を出す前に `/qc` を実行し、その結果をQCレポートに含めること
+  - `/qc` の最終判定が `CONDITIONAL PASS` の場合は、`--escalate` フラグを用いて将軍へエスカレーションすること
 - **[ACTIVE_PATTERNS照合]** QC開始時に `queue/postmortems/ACTIVE_PATTERNS.md` を読み込み（step 2.5）、各パターンをタスクに照合せよ:
   - 各パターンの「確認観点」が今回のタスクに関係するか判定
   - 関係する場合: 実際に確認し、finding（確認結果）を記載

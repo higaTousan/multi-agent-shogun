@@ -23,6 +23,11 @@
 # Claude Code settings (spinner verbs only, no secrets)
 !.claude/
 !.claude/settings.json
+!.claude/skills/
+!.claude/skills/qc/
+!.claude/skills/qc/SKILL.md
+!.claude/skills/qc/references/
+!.claude/skills/qc/references/*.md
 
 # Instructions (core OSS)
 !instructions/
@@ -95,6 +100,7 @@
 !scripts/seo_qc.sh
 !scripts/stop_hook_inbox.sh
 !scripts/agent_status.sh
+!scripts/qc_validate.sh
 !scripts/update_active_patterns.sh
 !scripts/bin/
 !scripts/bin/gh

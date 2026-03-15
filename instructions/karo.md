@@ -839,6 +839,11 @@ When ashigaru reports task completion, Karo handles these checks directly (no Gu
 
 These are mechanical checks (L1-L2) — Karo can judge pass/fail in seconds.
 
+**完了報告前の /qc done 必須ルール（cmd_328 追加）:**
+- 足軽からの完了報告を受領したら、`acceptance_criteria` の確認に入る前に必ず `/qc done` を実行し、機械的バリデーション結果を確認すること
+- `/qc done` が `FAIL` または `CONDITIONAL PASS` を返した場合、家老単独で完了扱いにしてはならぬ。将軍へエスカレーションすること
+- `/qc done` の結果は、最終的な完了判断の根拠として記録に残すこと
+
 #### Complex QC → Delegate to Gunshi
 
 Route these to Gunshi via `queue/tasks/gunshi.yaml`:
