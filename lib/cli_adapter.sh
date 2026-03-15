@@ -301,22 +301,51 @@ validate_cli_availability() {
 get_agent_model() {
     local agent_id="$1"
 
-    # まずsettings.yamlのcli.agents.{id}.modelを確認
-    local model_from_yaml
-    model_from_yaml=$(_cli_adapter_read_yaml "cli.agents.${agent_id}.model" "")
+    local configured_model
+    configured_model=$(_cli_adapter_read_yaml "cli.agents.${agent_id}.model" "")
 
-    if [[ -n "$model_from_yaml" ]]; then
-        echo "$model_from_yaml"
-        return 0
+    if [[ -z "$configured_model" ]]; then
+        configured_model=$(_cli_adapter_read_yaml "models.${agent_id}" "")
     fi
 
-    # 既存のmodelsセクションを確認
-    local model_from_models
-    model_from_models=$(_cli_adapter_read_yaml "models.${agent_id}" "")
-
-    if [[ -n "$model_from_models" ]]; then
-        echo "$model_from_models"
-        return 0
+    if [[ -n "$configured_model" ]]; then
+        case "$configured_model" in
+            bloom_max)
+                local cost_group
+                cost_group=$(get_agent_cost_group "$agent_id")
+                if [[ -n "$cost_group" && "$cost_group" != "unknown" ]]; then
+                    local resolved_model
+                    resolved_model=$(get_max_model_for_cost_group "$cost_group")
+                    if [[ -n "$resolved_model" ]]; then
+                        echo "$resolved_model"
+                        return 0
+                    fi
+                fi
+                ;;
+            bloom_L[1-6])
+                local bloom_level cost_group
+                bloom_level="${configured_model#bloom_L}"
+                cost_group=$(get_agent_cost_group "$agent_id")
+                if [[ -n "$cost_group" && "$cost_group" != "unknown" ]]; then
+                    local resolved_model
+                    resolved_model=$(get_model_for_cost_group_and_bloom "$cost_group" "$bloom_level")
+                    if [[ -n "$resolved_model" ]]; then
+                        echo "$resolved_model"
+                        return 0
+                    fi
+                fi
+                local fallback_model
+                fallback_model=$(get_recommended_model "$bloom_level")
+                if [[ -n "$fallback_model" ]]; then
+                    echo "$fallback_model"
+                    return 0
+                fi
+                ;;
+            *)
+                echo "$configured_model"
+                return 0
+                ;;
+        esac
     fi
 
     # デフォルトロジック（CLI種別に応じた初期値）
@@ -496,6 +525,142 @@ except Exception:
     else
         echo "$result"
     fi
+}
+
+# get_default_cost_group_for_cli(cli_type)
+# CLI種別から標準のcost_groupを返す
+get_default_cost_group_for_cli() {
+    local cli_type="$1"
+
+    case "$cli_type" in
+        claude) echo "claude_max" ;;
+        codex|copilot) echo "chatgpt_plus" ;;
+        gemini) echo "gemini_free" ;;
+        *) echo "unknown" ;;
+    esac
+}
+
+# get_agent_cost_group(agent_id)
+# エージェント設定からcost_groupを返す
+get_agent_cost_group() {
+    local agent_id="$1"
+
+    local explicit_cost_group
+    explicit_cost_group=$(_cli_adapter_read_yaml "cli.agents.${agent_id}.cost_group" "")
+    if [[ -n "$explicit_cost_group" ]]; then
+        echo "$explicit_cost_group"
+        return 0
+    fi
+
+    local configured_model
+    configured_model=$(_cli_adapter_read_yaml "cli.agents.${agent_id}.model" "")
+    if [[ -n "$configured_model" && ! "$configured_model" =~ ^bloom_(max|L[1-6])$ ]]; then
+        local configured_group
+        configured_group=$(get_cost_group "$configured_model")
+        if [[ -n "$configured_group" && "$configured_group" != "unknown" ]]; then
+            echo "$configured_group"
+            return 0
+        fi
+    fi
+
+    local cli_type
+    cli_type=$(get_cli_type "$agent_id")
+    get_default_cost_group_for_cli "$cli_type"
+}
+
+# get_max_model_for_cost_group(cost_group)
+# 指定cost_groupで最も高いBloomレベルに対応するモデルを返す
+get_max_model_for_cost_group() {
+    local cost_group="$1"
+
+    if [[ -z "$cost_group" || "$cost_group" == "unknown" ]]; then
+        echo ""
+        return 0
+    fi
+
+    local result
+    result=$("$CLI_ADAPTER_PROJECT_ROOT/.venv/bin/python3" -c "
+import yaml, sys
+try:
+    with open('${CLI_ADAPTER_SETTINGS}') as f:
+        cfg = yaml.safe_load(f) or {}
+    tiers = cfg.get('capability_tiers')
+    if not isinstance(tiers, dict):
+        sys.exit(0)
+    candidates = []
+    for model, spec in tiers.items():
+        if not isinstance(spec, dict):
+            continue
+        if spec.get('cost_group') != '${cost_group}':
+            continue
+        max_bloom = spec.get('max_bloom', 0)
+        if isinstance(max_bloom, int):
+            candidates.append((max_bloom, str(model)))
+    if not candidates:
+        sys.exit(0)
+    candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    print(candidates[0][1])
+except Exception:
+    pass
+" 2>/dev/null)
+
+    echo "$result"
+}
+
+# get_model_for_cost_group_and_bloom(cost_group, bloom_level)
+# 指定cost_group内で指定Bloomレベルを満たす最小モデルを返す
+get_model_for_cost_group_and_bloom() {
+    local cost_group="$1"
+    local bloom_level="$2"
+
+    if [[ -z "$cost_group" || "$cost_group" == "unknown" ]]; then
+        echo ""
+        return 0
+    fi
+
+    if [[ ! "$bloom_level" =~ ^[1-6]$ ]]; then
+        echo ""
+        return 1
+    fi
+
+    local result
+    result=$("$CLI_ADAPTER_PROJECT_ROOT/.venv/bin/python3" -c "
+import yaml, sys
+try:
+    with open('${CLI_ADAPTER_SETTINGS}') as f:
+        cfg = yaml.safe_load(f) or {}
+    tiers = cfg.get('capability_tiers')
+    if not isinstance(tiers, dict):
+        sys.exit(0)
+    bloom = int('${bloom_level}')
+    candidates = []
+    all_models = []
+    for model, spec in tiers.items():
+        if not isinstance(spec, dict):
+            continue
+        if spec.get('cost_group') != '${cost_group}':
+            continue
+        max_bloom = spec.get('max_bloom', 0)
+        if not isinstance(max_bloom, int):
+            continue
+        all_models.append((max_bloom, str(model)))
+        if max_bloom >= bloom:
+            candidates.append((max_bloom, str(model)))
+    if candidates:
+        candidates.sort(key=lambda item: (item[0], item[1]))
+        same_bloom = [item for item in candidates if item[0] == candidates[0][0]]
+        same_bloom.sort(key=lambda item: item[1], reverse=True)
+        print(same_bloom[0][1])
+        sys.exit(0)
+    if all_models:
+        all_models.sort(key=lambda item: (-item[0], item[1]))
+        print(all_models[0][1])
+        print(f'[WARN] insufficient in cost_group ${cost_group}: {all_models[0][1]} (max_bloom={all_models[0][0]}) cannot handle bloom level {bloom}', file=sys.stderr)
+except Exception:
+    pass
+" 2>/dev/null)
+
+    echo "$result"
 }
 
 # get_available_cost_groups()
