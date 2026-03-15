@@ -476,3 +476,84 @@ report:
     - gemma_Analysis_*.md ファイル生成確認 ✓
     - 本番ファイル変更なし確認 ✓
     - 処理時間・ファイルサイズ記録完了 ✓
+
+---
+
+report:
+  task_id: subtask_322a
+  status: completed
+  timestamp: "2026-03-15T11:45:00+09:00"
+
+  実施内容:
+    【STEP 1】非表示対象ファイル特定
+      grep で個人サイクル関連ファイルを検索:
+      - app/liff/appraisal/list/page.tsx
+      - app/liff/appraisal/personal-cycle/page.tsx
+      - app/liff/appraisal/personal-cycle/view/[id]/page.tsx
+      - components/appraisal/AppraisalViewContent.tsx
+      - components/appraisal/PaymentButton.tsx
+      - components/appraisal/PersonalCycleView.tsx
+      - components/AppraisalLiffForm.tsx
+      - components/liff/AppraisalPersonalCycleContent.tsx
+      - components/liff/HubApp.tsx
+      - components/liff/LiffMenuView.tsx
+
+    【STEP 2】非表示実装（コード削除禁止）
+      修正対象（3ファイル）:
+
+      1. components/liff/LiffMenuView.tsx
+         - 個人サイクル鑑定ボタン（lines 29-36）をコメントアウト
+         - TODO コメント付き: "TODO: cmd_322 個人サイクル正式テキスト受領後に復活"
+
+      2. components/liff/HubApp.tsx
+         - AppraisalPersonalCycleContent インポートをコメントアウト（import時点で復活指示）
+         - renderパートでの appraisal_personal_cycle ケース（lines 107-112）をコメントアウト
+         - TODO コメント付き: "TODO: cmd_322 個人サイクル正式テキスト受領後に復活"
+
+      3. app/liff/appraisal/list/page.tsx
+         - 下部リンク「個人サイクルを作成」（line 234）をコメントアウト
+         - TODO コメント付き: "TODO: cmd_322 個人サイクル正式テキスト受領後に復活"
+
+    【STEP 3】TypeCheck実行
+      コマンド: cd /Users/toichiro/Dev/numerology-app && npx tsc --noEmit
+      結果: Exit code 0 → エラーなし ✓
+
+    【STEP 4】ブランチ・コミット・PR作成
+      - ブランチ作成: feat/cmd322-hide-cycle-plan
+      - コミット: e9a4f9a
+      - コミットメッセージ: feat(cmd322): 個人サイクル鑑定を一時非表示（正式テキスト受領まで）
+      - Push: origin/feat/cmd322-hide-cycle-plan へ完了
+      - PR preflight: ✓ PASS（全5項目確認完了）
+      - PR作成: gh pr create で実行完了
+
+  検証結果:
+    - 非表示ファイル数: 3ファイル確認
+    - コード削除: なし（全てコメントアウト） ✓
+    - TODO コメント: 全3箇所に復活条件記載 ✓
+    - 型チェック: npx tsc --noEmit → Exit code 0 ✓
+    - ブランチpush: ✓ origin/feat/cmd322-hide-cycle-plan
+    - PR preflight: 5項目全て PASS ✓
+
+  変更ファイル:
+    - components/liff/LiffMenuView.tsx (insertions: 3, deletions: 0)
+    - components/liff/HubApp.tsx (insertions: 2, deletions: 1)
+    - app/liff/appraisal/list/page.tsx (insertions: 2, deletions: 1)
+
+  PR情報:
+    - PR番号: #200
+    - ブランチ: feat/cmd322-hide-cycle-plan
+    - タイトル: feat(cmd322): 個人サイクル鑑定を一時非表示（正式テキスト受領まで）
+    - URL: https://github.com/higaTousan/numerology-app/pull/200
+
+  完了条件:
+    - 個人サイクル鑑定がメニュー・導線から非表示 ✓
+    - コードは削除されず、コメントアウト + TODO記載 ✓
+    - 7つの数字の鑑定書は引き続き表示 ✓
+    - TypeCheck PASS ✓
+    - レイアウト崩れなし ✓
+    - PR作成済み（#200） ✓
+
+  補足:
+    - end_user: 七宝数秘サービス利用者（Rino様のサービス購入を検討するユーザー）
+    - user_perspective: メニュー画面で個人サイクルが非表示になっていることを確認
+    - 既購入の個人サイクル鑑定書は一覧から閲覧可能（後方互換性を保持）
